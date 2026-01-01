@@ -232,8 +232,11 @@
         {
             Navigation.NavigateTo("/login");
         }
-        // await LoadOrganizationSettings();
-        // await LoadDashboardData();
+        else 
+        {
+            await LoadOrganizationSettings();
+            await LoadDashboardData();
+        }
     }
 
     private async Task LoadOrganizationSettings()

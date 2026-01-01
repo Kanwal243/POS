@@ -1,4 +1,8 @@
-﻿@inherits LayoutComponentBase
+﻿@using EyeHospitalPOS.Models
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@inherits LayoutComponentBase
+@inject AuthenticationStateProvider AuthStateProvider
 @inject EyeHospitalPOS.Helper.LoginManager LoginManager
 @inject IJSRuntime JSRuntime
 
@@ -48,9 +52,29 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // Initialize LoginManager from session storage (restores session on refresh)
-        // This is safe during prerendering because it uses HttpContext/Session
+        // 1. Try to load from session first
         await LoginManager.InitializeAsync();
+        
+        // 2. Fallback: If LoginManager failed to retrieve session (common in SignalR circuit)
+        // but AuthStateProvider claims we are authenticated (from initial HttpContext),
+        // we manually re-hydrate LoginManager from Claims.
+        if (!LoginManager.IsLoggedIn)
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            
+            if (user.Identity != null && user.Identity.IsAuthenticated)
+            {
+                 // Reconstruct User from Claims
+                 LoginManager.CurrentUser = new User 
+                 {
+                     Id = user.FindFirst("UserId")?.Value ?? "",
+                     UserName = user.FindFirst(ClaimTypes.Name)?.Value ?? user.Identity.Name ?? "User",
+                     Email = user.FindFirst(ClaimTypes.Email)?.Value ?? "",
+                     Role = new Role { Name = user.FindFirst(ClaimTypes.Role)?.Value ?? "User" }
+                 };
+            }
+        }
         
         // Debug: Log if user is loaded
         Console.WriteLine($"MainLayout: LoginManager.IsLoggedIn = {LoginManager.IsLoggedIn}, User = {LoginManager.CurrentUser?.UserName}");
