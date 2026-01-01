@@ -1,0 +1,26 @@
+﻿@page "/"
+@using EyeHospitalPOS.Helper
+@inject LoginManager LoginManager
+@inject NavigationManager Navigation
+
+<PageTitle>Eye Hospital POS</PageTitle>
+
+@code {
+    private bool hasNavigated = false;
+
+    protected override void OnAfterRender(bool firstRender){
+    // {
+        if (firstRender && !hasNavigated)
+        {
+            hasNavigated = true;
+            if (LoginManager.IsLoggedIn)
+            {
+                Navigation.NavigateTo("/dashboard");
+            }
+            else
+            {
+                Navigation.NavigateTo("/login");
+            }
+        }
+    }
+}

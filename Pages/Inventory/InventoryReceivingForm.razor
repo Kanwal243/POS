@@ -1,0 +1,619 @@
+@page "/inventory-receiving/new"
+@page "/inventory-receiving/{Id:int}"
+@using EyeHospitalPOS.Models
+@using EyeHospitalPOS.Interfaces
+@using EyeHospitalPOS.Data
+@using EyeHospitalPOS.Helper
+@using EyeHospitalPOS.Components
+@using Microsoft.EntityFrameworkCore
+@inject IInventoryService InventoryService
+@inject IProductService ProductService
+@inject ApplicationDbContext DbContext
+@inject NavigationManager Navigation
+@inject LoginManager LoginManager
+@inject IPurchaseOrderService PurchaseOrderService
+@inject IJSRuntime JSRuntime
+
+
+<PageTitle>@(Id == 0 ? "New Receiving" : $"IR-{CurrentIR.IRNumber}") - Eye Hospital POS</PageTitle>
+
+@if (LoginManager.CurrentUser == null)
+{
+    <div class="alert alert-warning m-4">Please login to access this page.</div>
+}
+else
+{
+    <div class="page-container" style="padding-bottom: 80px;"> <!-- Padding for sticky footer -->
+        
+        <!-- Sticky Toolbar -->
+        <div class="sticky-top d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-3">
+                <DxButton RenderStyle="ButtonRenderStyle.Secondary" 
+                          IconCssClass="fa-solid fa-arrow-left" 
+                          SizeMode="SizeMode.Small"
+                          CssClass="btn-toolbar"
+                          Click="@(() => Navigation.NavigateTo("/inventory-receiving"))" />
+                
+                <div>
+                    <h5 class="mb-0 fw-bold">@(Id == 0 ? "New Receiving" : CurrentIR.IRNumber)</h5>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge @GetStatusBadgeClass(CurrentIR.Status)">@CurrentIR.Status</span>
+                        @if (CurrentIR.Status == InventoryStatus.Active)
+                        {
+                            <span class="text-muted tiny"><i class="fa-solid fa-lock me-1"></i>Locked</span>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="toolbar-actions">
+                @if (CurrentIR.Status == InventoryStatus.Draft)
+                {
+                    <DxButton Text="Cancel IR" 
+                              RenderStyle="ButtonRenderStyle.Secondary" 
+                              IconCssClass="fa-solid fa-xmark"
+                              SizeMode="SizeMode.Small"
+                              CssClass="btn-toolbar"
+                              Click="CancelIR" />
+
+                    <DxButton Text="Save Draft" 
+                              RenderStyle="ButtonRenderStyle.Secondary" 
+                              IconCssClass="fa-solid fa-floppy-disk"
+                              SizeMode="SizeMode.Small"
+                              CssClass="btn-toolbar"
+                              Click="SaveDraft" />
+
+                     <DxButton Text="Activate IR" 
+                              RenderStyle="ButtonRenderStyle.Success" 
+                              IconCssClass="fa-solid fa-check"
+                              SizeMode="SizeMode.Small"
+                              CssClass="btn-toolbar"
+                              Click="ActivateIR" />
+                }
+                else if (CurrentIR.Status == InventoryStatus.Active)
+                {
+                    <DxButton Text="Deactivate IR" 
+                              RenderStyle="ButtonRenderStyle.Warning" 
+                              IconCssClass="fa-solid fa-arrow-rotate-left"
+                              SizeMode="SizeMode.Small"
+                              CssClass="btn-toolbar"
+                              Click="DeactivateIR" />
+                }
+            </div>
+        </div>
+
+        <!-- Header Information Form -->
+        <div class="premium-card mt-3 mx-4">
+            <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; padding: 0.75rem 1.25rem;">
+                <h6 class="text-white mb-0 fw-semibold">Inventory Receiving</h6>
+            </div>
+            <div class="card-body p-4" style="background-color: #f8f9fa;">
+                <DxFormLayout Data="@CurrentIR" ItemSpacing="10px" CaptionPosition="CaptionPosition.Horizontal">
+                    <DxFormLayoutGroup ColSpanLg="12">
+                        <!-- Row 1: IR No and Transaction Date -->
+                        <DxFormLayoutItem Caption="IR No:" ColSpanLg="6" ColSpanMd="12">
+                            <DxTextBox Text="@CurrentIR.IRNumber" ReadOnly="true" EnableValidation="false" />
+                        </DxFormLayoutItem>
+                        <DxFormLayoutItem Caption="Transaction Date:" ColSpanLg="6" ColSpanMd="12">
+                            <DxDateEdit @bind-Date="@CurrentIR.ReceivingDate" 
+                                        EnableValidation="false"
+                                        Enabled="@(CurrentIR.Status == InventoryStatus.Draft)" />
+                        </DxFormLayoutItem>
+                        
+                        <!-- Row 2: Supplier and Purchase Order -->
+                        <DxFormLayoutItem Caption="Supplier:" ColSpanLg="6" ColSpanMd="12">
+                            <DxComboBox Data="@Suppliers" 
+                                        @bind-Value="@CurrentIR.SupplierId" 
+                                        ValueFieldName="Id" 
+                                        TextFieldName="Name" 
+                                        FilteringMode="DataGridFilteringMode.Contains"
+                                        EnableValidation="false"
+                                        Enabled="@(CurrentIR.Status == InventoryStatus.Draft)" />
+                        </DxFormLayoutItem>
+                        <DxFormLayoutItem Caption="Purchase Order:" ColSpanLg="6" ColSpanMd="12">
+                            <DxTextBox @bind-Text="@ConvertPurchaseOrderId" 
+                                       NullText="Optional PO Number" 
+                                       EnableValidation="false"
+                                       Enabled="@(CurrentIR.Status == InventoryStatus.Draft)" />
+                        </DxFormLayoutItem>
+                        
+                        <!-- Row 3: Supplier Invoice No and Invoice Date -->
+                        <DxFormLayoutItem Caption="Supplier Invoice No:" ColSpanLg="6" ColSpanMd="12">
+                            <DxTextBox @bind-Text="@CurrentIR.SupplierInvoiceNo" 
+                                       EnableValidation="false"
+                                       Enabled="@(CurrentIR.Status == InventoryStatus.Draft)" />
+                        </DxFormLayoutItem>
+                        <DxFormLayoutItem Caption="Invoice Date:" ColSpanLg="6" ColSpanMd="12">
+                            <DxDateEdit @bind-Date="@CurrentIR.SupplierInvoiceDate" 
+                                        EnableValidation="false"
+                                        Enabled="@(CurrentIR.Status == InventoryStatus.Draft)" />
+                        </DxFormLayoutItem>
+                        
+                        <!-- Row 4: Received By and Total Amount -->
+                        <DxFormLayoutItem Caption="Received By:" ColSpanLg="6" ColSpanMd="12">
+                            <DxTextBox @bind-Text="@CurrentIR.ReceivedBy" 
+                                       NullText="Person receiving goods" 
+                                       EnableValidation="false"
+                                       Enabled="@(CurrentIR.Status == InventoryStatus.Draft)" />
+                        </DxFormLayoutItem>
+                        <DxFormLayoutItem Caption="Total Amount:" ColSpanLg="6" ColSpanMd="12">
+                            <DxSpinEdit Value="@CurrentIR.TotalAmount" 
+                                        ReadOnly="true" 
+                                        DisplayFormat="@($"{currencySymbol} #,0.00")" 
+                                        ShowSpinButtons="false"
+                                        EnableValidation="false" />
+                        </DxFormLayoutItem>
+                        
+                        <!-- Row 5: Description (full width) -->
+                        <DxFormLayoutItem Caption="Description:" ColSpanLg="12">
+                            <DxMemo @bind-Text="@CurrentIR.Description" 
+                                    Rows="6"
+                                    EnableValidation="false"
+                                    Enabled="@(CurrentIR.Status == InventoryStatus.Draft)" />
+                        </DxFormLayoutItem>
+                    </DxFormLayoutGroup>
+                </DxFormLayout>
+            </div>
+        </div>
+
+        <!-- Items Grid -->
+        <div class="premium-card mt-3 mx-4">
+            <div class="card-header bg-light py-2 d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fa-solid fa-truck-ramp-box text-success"></i>
+                    <span class="fw-bold text-dark">Received Items</span>
+                </div>
+               
+            </div>
+            
+            <div class="card-body p-0">
+                <DxGrid Data="@CurrentIR.InventoryReceivingItems"
+                        EditMode="GridEditMode.EditRow"
+                        EditorRenderMode="GridEditorRenderMode.Integrated"
+                        EditModelSaving="OnItemSaving"
+                        DataItemDeleting="OnItemDeleting"
+                        CssClass="enterprise-grid">
+                    <Columns>
+                        <DxGridDataColumn Caption="Product" FieldName="ProductId" MinWidth="250">
+                            <CellDisplayTemplate>
+                                @{
+                                    var item = (InventoryReceivingItem)context.DataItem;
+                                    var prod = Products.FirstOrDefault(p => p.Id == item.ProductId);
+                                    <span>@(prod?.Name ?? "Select Product")</span>
+                                }
+                            </CellDisplayTemplate>
+                            <CellEditTemplate>
+                                <DxComboBox Data="@Products"
+                                            Value="@(((InventoryReceivingItem)context.EditModel).ProductId)"
+                                            ValueChanged="@((int newValue) => { ((InventoryReceivingItem)context.EditModel).ProductId = newValue; })"
+                                            ValueFieldName="Id"
+                                            TextFieldName="Name"
+                                            FilteringMode="DataGridFilteringMode.Contains"
+                                            EnableValidation="false" />
+                            </CellEditTemplate>
+                        </DxGridDataColumn>
+                        
+                        <DxGridDataColumn FieldName="Quantity" Caption="Qty" Width="100px">
+                             <CellEditTemplate>
+                                <DxSpinEdit Value="@(((InventoryReceivingItem)context.EditModel).Quantity)"
+                                            ValueChanged="@((int newValue) => { 
+                                                ((InventoryReceivingItem)context.EditModel).Quantity = newValue; 
+                                                CalculateItemTotal(context.EditModel);
+                                            })"
+                                            MinValue="1" 
+                                            EnableValidation="false" />
+                            </CellEditTemplate>
+                        </DxGridDataColumn>
+                        
+                        <DxGridDataColumn FieldName="CostPrice" Caption="Unit Cost" Width="150px">
+                            <CellEditTemplate>
+                                <DxSpinEdit Value="@(((InventoryReceivingItem)context.EditModel).CostPrice)"
+                                            ValueChanged="@((decimal newValue) => { 
+                                                ((InventoryReceivingItem)context.EditModel).CostPrice = newValue; 
+                                                CalculateItemTotal(context.EditModel);
+                                            })"
+                                            MinValue="0" 
+                                            DisplayFormat="@($"{currencySymbol} #,0.00")"
+                                            EnableValidation="false" />
+                            </CellEditTemplate>
+                        </DxGridDataColumn>
+                        
+                        <DxGridDataColumn FieldName="Subtotal" Caption="Amount" Width="150px" ReadOnly="true">
+                             <CellDisplayTemplate>
+                                 <span class="fw-bold">@($"{currencySymbol} {((decimal)context.Value).ToString("N2")}")</span>
+                             </CellDisplayTemplate>
+                        </DxGridDataColumn>
+
+                        @if (CurrentIR.Status == InventoryStatus.Draft)
+                        {
+                            <DxGridDataColumn Width="140px">
+                                <HeaderCaptionTemplate>
+                                    <div class="d-flex justify-content-center align-items-center w-100 gap-2">
+                                        <DxButton RenderStyle="ButtonRenderStyle.Secondary" 
+                                                  IconCssClass="fa-solid fa-plus" 
+                                                  SizeMode="SizeMode.Small"
+                                                  Click="@(() => ShowProductModal = true)"
+                                                  title="Add New Item manually" />
+                                        
+                                        <DxButton RenderStyle="ButtonRenderStyle.Secondary" 
+                                                  IconCssClass="fa-solid fa-qrcode" 
+                                                  SizeMode="SizeMode.Small"
+                                                  Click="@(() => ShowScannerModal = true)"
+                                                  title="Scan Barcode" />
+                                    </div>
+                                </HeaderCaptionTemplate>
+                                <CellDisplayTemplate>
+                                    <div class="d-flex gap-2 justify-content-center">
+                                        <DxButton HtmlElementId="@($"edit-btn-{((InventoryReceivingItem)context.DataItem).ProductId}")"
+                                                  Text="+" 
+                                                  RenderStyle="ButtonRenderStyle.Primary" 
+                                                  SizeMode="SizeMode.Small"
+                                                  Click="@(() => OpenModifyModalForItem((InventoryReceivingItem)context.DataItem))" />
+                                        <DxButton HtmlElementId="@($"del-btn-{((InventoryReceivingItem)context.DataItem).ProductId}")"
+                                                  RenderStyle="ButtonRenderStyle.Danger" 
+                                                  IconCssClass="fa-solid fa-trash"
+                                                  SizeMode="SizeMode.Small"
+                                                  Click="@(() => {
+                                                      var item = (InventoryReceivingItem)context.DataItem;
+                                                      CurrentIR.InventoryReceivingItems.Remove(item);
+                                                      RecalculateTotal();
+                                                      StateHasChanged();
+                                                  })" />
+                                    </div>
+                                </CellDisplayTemplate>
+                            </DxGridDataColumn>
+                        }
+                    </Columns>
+                </DxGrid>
+            </div>
+        </div>
+
+        <!-- Footer Summary -->
+        <div class="premium-card footer-summary mt-4 mx-4 p-4 d-flex justify-content-end align-items-center gap-5">
+            <div>
+                <span class="summary-label d-block mb-1">Total Items</span>
+                <span class="summary-value fs-4">@CurrentIR.InventoryReceivingItems.Sum(i => i.Quantity)</span>
+            </div>
+            <div>
+                <span class="summary-label d-block mb-1">Total Amount</span>
+                <span class="summary-value highlight fs-3">@($"{currencySymbol} {CurrentIR.TotalAmount.ToString("N2")}")</span>
+            </div>
+        </div>
+
+        <!-- Product Selection Modal -->
+        <DxPopup @bind-Visible="@ShowProductModal"
+                 HeaderText="Select Product"
+                 Width="800px"
+                 Height="600px"
+                 ShowCloseButton="true">
+            <BodyContentTemplate>
+                <div class="p-3">
+                    <DxGrid Data="@Products"
+                            ShowFilterRow="true"
+                            ShowSearchBox="true"
+                            PageSize="15"
+                            CssClass="enterprise-grid">
+                        <Columns>
+                            <DxGridDataColumn FieldName="Name" Caption="Product Name" MinWidth="200" />
+                            <DxGridDataColumn FieldName="Category.Name" Caption="Category" Width="150" />
+                            <DxGridDataColumn FieldName="Type.Name" Caption="Type" Width="150" />
+                            <DxGridDataColumn FieldName="CostPrice" Caption="Cost Price" Width="120">
+                                <CellDisplayTemplate Context="productContext">
+                                    @($"{currencySymbol} {((Product)productContext.DataItem).CostPrice.ToString("N2")}")
+                                </CellDisplayTemplate>
+                            </DxGridDataColumn>
+                            <DxGridDataColumn Caption="Action" Width="100" TextAlignment="GridTextAlignment.Center">
+                                <CellDisplayTemplate Context="productContext">
+                                    @{
+                                        var product = (Product)productContext.DataItem;
+                                    }
+                                    <DxButton Text="Select" 
+                                              RenderStyle="ButtonRenderStyle.Primary" 
+                                              SizeMode="SizeMode.Small"
+                                              Click="@(() => SelectProduct(product))" />
+                                </CellDisplayTemplate>
+                            </DxGridDataColumn>
+                        </Columns>
+                    </DxGrid>
+                </div>
+            </BodyContentTemplate>
+        </DxPopup>
+    <CameraScannerModal ShowScanner="@ShowScannerModal"
+                            OnProductsScanned="@HandleProductsScanned"
+                            OnScannerClosed="@((val) => ShowScannerModal = val)" />
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    [SupplyParameterFromQuery] public int? poId { get; set; }
+    
+    private EyeHospitalPOS.Models.InventoryReceiving CurrentIR = new() { InventoryReceivingItems = new List<InventoryReceivingItem>() };
+    private List<Supplier> Suppliers = new();
+    private List<Product> Products = new();
+    private bool ShowProductModal = false;
+    private bool ShowScannerModal = false;
+    private string currencySymbol = "$";
+    
+    // Helper for PurchaseOrderId textbox since it's int?
+    private string ConvertPurchaseOrderId
+    {
+        get => CurrentIR.PurchaseOrderId?.ToString() ?? "";
+        set => CurrentIR.PurchaseOrderId = int.TryParse(value, out int result) ? result : null;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (LoginManager.CurrentUser == null)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        Suppliers = await DbContext.Suppliers.AsNoTracking().ToListAsync();
+        Products = await ProductService.GetAllProductsAsync();
+        await LoadOrganizationSettings();
+
+        if (Id != 0)
+        {
+            var existing = await InventoryService.GetInventoryReceivingByIdAsync(Id);
+            if (existing != null)
+            {
+                CurrentIR = existing;
+                if (CurrentIR.InventoryReceivingItems == null) 
+                    CurrentIR.InventoryReceivingItems = new List<InventoryReceivingItem>();
+            }
+        }
+        else
+        {
+            CurrentIR.IRNumber = InventoryService.GenerateIRNumber();
+            CurrentIR.ReceivingDate = DateTime.Now;
+
+            // Check for PO to generate from
+            if (poId.HasValue && poId.Value > 0)
+            {
+                var po = await PurchaseOrderService.GetPurchaseOrderByIdAsync(poId.Value);
+                if (po != null)
+                {
+                    CurrentIR.SupplierId = po.SupplierId;
+                    CurrentIR.PurchaseOrderId = po.Id;
+                    CurrentIR.Description = $"Generated from PO-{po.PONumber}";
+                    CurrentIR.ReceivedBy = LoginManager.CurrentUser.UserName; // Optional default
+
+                    if (po.PurchaseItems != null)
+                    {
+                        foreach (var poItem in po.PurchaseItems)
+                        {
+                            var remainingQty = poItem.Quantity - poItem.ReceivedQuantity;
+                            if (remainingQty > 0)
+                            {
+                                CurrentIR.InventoryReceivingItems.Add(new InventoryReceivingItem
+                                {
+                                    ProductId = poItem.ProductId,
+                                    Quantity = remainingQty,
+                                    CostPrice = poItem.UnitPrice,
+                                    Subtotal = remainingQty * poItem.UnitPrice
+                                });
+                            }
+                        }
+                    }
+                    RecalculateTotal();
+                }
+            }
+        }
+    }
+
+    private async Task LoadOrganizationSettings()
+    {
+        var org = await DbContext.Organizations.FirstOrDefaultAsync();
+        currencySymbol = CurrencyHelper.GetCurrencySymbol(org);
+    }
+
+    private void CalculateItemTotal(object editModel)
+    {
+        // Reflection to calculate totals dynamically during edit
+        try {
+            var qtyProp = editModel.GetType().GetProperty("Quantity");
+            var costProp = editModel.GetType().GetProperty("CostPrice");
+            var subProp = editModel.GetType().GetProperty("Subtotal");
+
+            int qty = (int)qtyProp.GetValue(editModel);
+            decimal cost = (decimal)costProp.GetValue(editModel);
+            
+            subProp.SetValue(editModel, qty * cost);
+        } catch {}
+    }
+
+    private void RecalculateTotal()
+    {
+        CurrentIR.TotalAmount = CurrentIR.InventoryReceivingItems.Sum(i => i.Subtotal);
+    }
+
+    private async Task OnItemSaving(GridEditModelSavingEventArgs e)
+    {
+        e.Cancel = true; // Handle manually
+        
+        var item = (InventoryReceivingItem)e.EditModel;
+        var existingItem = e.DataItem as InventoryReceivingItem;
+
+        // Validation
+        if (item.ProductId == 0 || item.Quantity <= 0) return;
+
+        // Calculate Subtotal explicitly
+        item.Subtotal = item.Quantity * item.CostPrice;
+
+        if (e.IsNew)
+        {
+            item.InventoryReceivingId = CurrentIR.Id;
+            CurrentIR.InventoryReceivingItems.Add(item);
+        }
+        else
+        {
+             // Update in-place if bound references work, otherwise copy props
+             if (existingItem != null)
+             {
+                 existingItem.ProductId = item.ProductId;
+                 existingItem.Quantity = item.Quantity;
+                 existingItem.CostPrice = item.CostPrice;
+                 existingItem.Subtotal = item.Subtotal;
+             }
+        }
+
+        RecalculateTotal();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnItemDeleting(GridDataItemDeletingEventArgs e)
+    {
+        var item = (InventoryReceivingItem)e.DataItem;
+        CurrentIR.InventoryReceivingItems.Remove(item);
+        RecalculateTotal();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SaveDraft()
+    {
+        if (CurrentIR.SupplierId == 0)
+        {
+            // Show alert
+            await JSRuntime.InvokeVoidAsync("alert", "Validation Error: Supplier is required.");
+            return;
+        }
+
+        if (CurrentIR.Id == 0)
+        {
+            CurrentIR = await InventoryService.CreateInventoryReceivingAsync(CurrentIR);
+        }
+        else
+        {
+            CurrentIR = await InventoryService.UpdateInventoryReceivingAsync(CurrentIR);
+        }
+        Navigation.NavigateTo($"/inventory-receiving/{CurrentIR.Id}");
+    }
+
+    private async Task ActivateIR()
+    {
+        if (CurrentIR.Id == 0) await SaveDraft(); // Save first
+
+        // Confirmation (Simple JS confirm for now)
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to activate this Inventory Receiving? This will update stock levels."))
+            return;
+
+        try
+        {
+            CurrentIR = await InventoryService.ActivateInventoryReceivingAsync(CurrentIR.Id, LoginManager.CurrentUser.Id);
+            await JSRuntime.InvokeVoidAsync("alert", "IR Activated Successfully!");
+        }
+        catch (Exception ex)
+        {
+             await JSRuntime.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+    }
+
+    private async Task DeactivateIR()
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", "This will reverse stock quantities. Continue?"))
+            return;
+
+        try
+        {
+            CurrentIR = await InventoryService.DeactivateInventoryReceivingAsync(CurrentIR.Id, LoginManager.CurrentUser.Id);
+            await JSRuntime.InvokeVoidAsync("alert", "IR Deactivated. Stock reversed.");
+        }
+        catch (Exception ex)
+        {
+             await JSRuntime.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+    }
+
+    private async Task CancelIR()
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", "Cancelled records cannot be reactivated. Continue?"))
+            return;
+
+        try
+        {
+            await InventoryService.CancelInventoryReceivingAsync(CurrentIR.Id, LoginManager.CurrentUser.Id);
+            CurrentIR.Status = InventoryStatus.Cancelled;
+            await JSRuntime.InvokeVoidAsync("alert", "IR Cancelled.");
+        }
+        catch (Exception ex)
+        {
+             await JSRuntime.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+    }
+
+    private void SelectProduct(Product product)
+    {
+        if (currentItemToModify != null)
+        {
+            // We're modifying an existing item
+            currentItemToModify.ProductId = product.Id;
+            currentItemToModify.CostPrice = product.CostPrice;
+            currentItemToModify.Subtotal = currentItemToModify.Quantity * product.CostPrice;
+            
+            currentItemToModify = null; // Reset the modify mode
+        }
+        else
+        {
+            // Check if product already exists in the list
+            var existingItem = CurrentIR.InventoryReceivingItems.FirstOrDefault(i => i.ProductId == product.Id);
+            if (existingItem != null)
+            {
+                // If exists, just increase quantity
+                existingItem.Quantity++;
+                existingItem.Subtotal = existingItem.Quantity * existingItem.CostPrice;
+            }
+            else
+            {
+                // Add new item
+                var newItem = new InventoryReceivingItem
+                {
+                    InventoryReceivingId = CurrentIR.Id,
+                    ProductId = product.Id,
+                    Quantity = 1,
+                    CostPrice = product.CostPrice,
+                    Subtotal = product.CostPrice
+                };
+                CurrentIR.InventoryReceivingItems.Add(newItem);
+            }
+        }
+        
+        RecalculateTotal();
+        ShowProductModal = false;
+        StateHasChanged();
+    }
+
+    private InventoryReceivingItem currentItemToModify = null;
+
+    private void OpenModifyModalForItem(InventoryReceivingItem item)
+    {
+        currentItemToModify = item;
+        ShowProductModal = true;
+    }
+
+
+
+    private string GetStatusBadgeClass(InventoryStatus status)
+    {
+        return status switch
+        {
+            InventoryStatus.Active => "bg-success text-white",
+            InventoryStatus.Cancelled => "bg-danger text-white",
+            _ => "bg-secondary text-white"
+        };
+    }
+
+ private void HandleProductsScanned(List<Product> scannedProducts)
+    {
+        if (scannedProducts == null) return;
+
+        foreach (var product in scannedProducts)
+        {
+            SelectProduct(product);
+        }
+        
+        ShowScannerModal = false;
+        StateHasChanged();
+    }
+}

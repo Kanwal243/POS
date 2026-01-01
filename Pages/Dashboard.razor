@@ -1,0 +1,263 @@
+@page "/dashboard";
+@using EyeHospitalPOS.Controllers
+@using EyeHospitalPOS.Helper
+@using EyeHospitalPOS.Models
+@using Microsoft.EntityFrameworkCore
+@using System.Drawing
+@using DevExpress.Blazor
+@inject DashboardController DashboardController
+@inject LoginManager LoginManager
+@inject NavigationManager Navigation
+@inject EyeHospitalPOS.Data.ApplicationDbContext DbContext
+@inject AuthenticationStateProvider AuthProvider
+
+
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+<PageTitle>Dashboard - Eye Hospital POS</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        <div class="page-container p-4">
+            <!-- Header Section -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h3 class="mb-1 fw-bold">Dashboard</h3>
+                    <p class="text-muted tiny mb-0">Real-time performance metrics and sales analytics</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <DxButton Text="Refresh Data" 
+                              RenderStyle="ButtonRenderStyle.Secondary" 
+                              IconCssClass="fa-solid fa-sync" 
+                              CssClass="premium-btn"
+                              Click="LoadDashboardData" />
+                </div>
+            </div>
+
+            <!-- Metrics Cards -->
+            <div class="row g-4 mb-4">
+                <!-- Customers Card -->
+                <div class="col-md-6 col-lg-3">
+                    <div class="premium-card">
+                        <div class="card-body p-4">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="bg-primary bg-opacity-10 p-3 rounded-circle me-3" style="width: 50px; height: 50px; display: flex; align-items: center; justify-content: center;">
+                                    <i class="fa-solid fa-users text-primary fs-5"></i>
+                                </div>
+                                <div>
+                                    <p class="text-muted tiny fw-bold text-uppercase mb-1">Customers</p>
+                                    <h2 class="mb-0 fw-bold">@data.CustomerCount</h2>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <span class="trend-badge positive me-2">
+                                    <i class="fa-solid fa-arrow-up me-1"></i> 12%
+                                </span>
+                                <span class="text-muted tiny">vs last month</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sales Card -->
+                <div class="col-md-6 col-lg-3">
+                    <div class="premium-card text-white bg-primary">
+                        <div class="card-body p-4">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="bg-white bg-opacity-20 p-3 rounded-circle me-3" style="width: 50px; height: 50px; display: flex; align-items: center; justify-content: center;">
+                                    <i class="fa-solid fa-coins text-white fs-5"></i>
+                                </div>
+                                <div>
+                                    <p class="text-white text-opacity-75 tiny fw-bold text-uppercase mb-1">Total Sales</p>
+                                    <h2 class="mb-0 fw-bold">@FormatCurrency(data.SalesAmount)</h2>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <span class="badge bg-white bg-opacity-20 text-white rounded-pill px-2 py-1 tiny me-2">
+                                    <i class="fa-solid fa-chart-line me-1"></i> +@data.SalesTrendPercentage%
+                                </span>
+                                <span class="text-white text-opacity-75 tiny">Growth</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Orders Card -->
+                <div class="col-md-6 col-lg-3">
+                    <div class="premium-card">
+                        <div class="card-body p-4">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="bg-success bg-opacity-10 p-3 rounded-circle me-3" style="width: 50px; height: 50px; display: flex; align-items: center; justify-content: center;">
+                                    <i class="fa-solid fa-shopping-cart text-success fs-5"></i>
+                                </div>
+                                <div>
+                                    <p class="text-muted tiny fw-bold text-uppercase mb-1">Total Orders</p>
+                                    <h2 class="mb-0 fw-bold">@data.TotalOrders</h2>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <span class="trend-badge neutral me-2">
+                                    <i class="fa-solid fa-circle me-1 tiny"></i> Stable
+                                </span>
+                                <span class="text-muted tiny">Month to date</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stock Card -->
+                <div class="col-md-6 col-lg-3">
+                    <div class="premium-card">
+                        <div class="card-body p-4">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="@(data.LowStockCount > 0 ? "bg-danger" : "bg-info") bg-opacity-10 p-3 rounded-circle me-3" style="width: 50px; height: 50px; display: flex; align-items: center; justify-content: center;">
+                                    <i class="fa-solid fa-boxes-stacked @(data.LowStockCount > 0 ? "text-danger" : "text-info") fs-5"></i>
+                                </div>
+                                <div>
+                                    <p class="text-muted tiny fw-bold text-uppercase mb-1">Low Stock Items</p>
+                                    <h2 class="mb-0 fw-bold @(data.LowStockCount > 0 ? "text-danger" : "")">@data.LowStockCount</h2>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <span class="text-muted tiny">
+                                    <i class="fa-solid fa-triangle-exclamation me-1"></i> Needs attention
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="row g-4 mb-4">
+                <!-- Sales History Chart -->
+                <div class="col-lg-8">
+                    <div class="premium-card h-100">
+                        <div class="card-header bg-white border-0 p-4 pb-0">
+                            <h5 class="fw-bold mb-0">Sales Analytics</h5>
+                            <p class="text-muted tiny">Monthly revenue distribution over the last 6 months</p>
+                        </div>
+                        <div class="card-body p-4">
+                            <DxChart Data="@data.MonthlySalesHistory" 
+                                     Height="350px"
+                                     CssClass="mw-100">
+                                <DxChartLegend Visible="false" />
+                                <DxChartLineSeries Name="Sales" 
+                                                  T="DashboardChartItem" 
+                                                  TArgument="string"
+                                                  TValue="decimal"
+                                                  ArgumentField="@(s => s.Label)" 
+                                                  ValueField="@(s => s.Value)">
+                                    <DxChartSeriesPoint Symbol="ChartPointSymbol.Circle" Size="8" />
+                                </DxChartLineSeries>
+                                <DxChartArgumentAxis>
+                                    <DxChartAxisTitle Text="Month" />
+                                </DxChartArgumentAxis>
+                            </DxChart>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Category Distribution Pie Chart -->
+                <div class="col-lg-4">
+                    <div class="premium-card h-100">
+                        <div class="card-header bg-white border-0 p-4 pb-0">
+                            <h5 class="fw-bold mb-0">Product Categories</h5>
+                            <p class="text-muted tiny">Sales volume by category</p>
+                        </div>
+                        <div class="card-body p-4">
+                            <DxPieChart Data="@data.CategorySales"
+                                       Height="350px">
+                                <DxPieChartSeries T="DashboardChartItem" 
+                                                 TArgument="string"
+                                                 TValue="decimal"
+                                                 ValueField="@(d => d.Value)" 
+                                                 ArgumentField="@(d => d.Label)">
+                                    <DxChartSeriesLabel Visible="true" Position="RelativePosition.Outside" />
+                                </DxPieChartSeries>
+                                <DxChartLegend Position="RelativePosition.Outside" VerticalAlignment="VerticalEdge.Bottom" />
+                            </DxPieChart>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tables Section -->
+            <div class="row g-4">
+                <!-- Recent Sales Grid -->
+                <div class="col-lg-12">
+                    <div class="premium-card">
+                        <div class="card-header bg-white border-0 p-4 pb-0 d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="fw-bold mb-0">Recent Transactions</h5>
+                                <p class="text-muted tiny">Latest completed sales orders</p>
+                            </div>
+                            <DxButton Text="View All Sales" RenderStyle="ButtonRenderStyle.Link" CssClass="tiny fw-bold" 
+                                      Click="@(() => Navigation.NavigateTo("/sales/history"))" />
+                        </div>
+                        <div class="card-body p-4 pt-2">
+                            <DxGrid Data="@data.RecentSales" 
+                                    ShowSearchBox="false"
+                                    PageSize="5"
+                                    CssClass="enterprise-grid">
+                                <Columns>
+                                    <DxGridDataColumn FieldName="InvoiceNumber" Caption="Invoice #" Width="150px" />
+                                    <DxGridDataColumn FieldName="CustomerName" Caption="Customer" Width="200px" />
+                                    <DxGridDataColumn FieldName="Date" Caption="Date" Width="180px" />
+                                    <DxGridDataColumn FieldName="Amount" Caption="Amount" Width="120px" DisplayFormat="C2" />
+                                    <DxGridDataColumn FieldName="Status" Caption="Status" Width="100px" />
+                                </Columns>
+                            </DxGrid>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <div class="alert alert-warning m-4">You are not authorized to view the dashboard. Please <a href="/login">login</a>.</div>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private EyeHospitalPOS.Controllers.DashboardData data = new EyeHospitalPOS.Controllers.DashboardData();
+    private string currencySymbol = "$";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (!user.Identity.IsAuthenticated)
+        {
+            Navigation.NavigateTo("/login");
+        }
+        // await LoadOrganizationSettings();
+        // await LoadDashboardData();
+    }
+
+    private async Task LoadOrganizationSettings()
+    {
+        var org = await DbContext.Organizations.FirstOrDefaultAsync();
+        currencySymbol = CurrencyHelper.GetCurrencySymbol(org);
+    }
+
+    private async Task LoadDashboardData()
+    {
+        var result = await DashboardController.LoadDashboardDataAsync();
+        if (result != null)
+        {
+            data = result;
+            StateHasChanged();
+        }
+    }
+
+    private string FormatCurrency(decimal value)
+    {
+        return $"{currencySymbol} {value.ToString("N2")}";
+    }
+}
+
+
+
+

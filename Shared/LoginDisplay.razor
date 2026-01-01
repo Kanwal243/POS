@@ -1,0 +1,68 @@
+﻿@inject EyeHospitalPOS.Helper.LoginManager LoginManager
+@inject NavigationManager Navigation
+
+<div class="user-dropdown-container">
+    @if (LoginManager.IsLoggedIn)
+    {
+        <div class="user-dropdown">
+            <button class="user-dropdown-toggle d-flex align-items-center" @onclick="ToggleDropdown">
+                <div class="user-avatar shadow-sm">
+                    <img src="https://ui-avatars.com/api/?name=@(LoginManager.GetUserName())&background=4e73df&color=fff" alt="Avatar" class="avatar-img" />
+                </div>
+                <div class="user-meta d-none d-lg-block text-start ms-3">
+                    <span class="user-name d-block fw-bold">@LoginManager.GetUserName()</span>
+                </div>
+                <i class="fa-solid fa-chevron-down ms-3 dropdown-arrow"></i>
+            </button>
+
+            @if (isDropdownOpen)
+            {
+                <div class="user-dropdown-menu shadow">
+                    <div class="user-dropdown-header p-3">
+                        <div class="user-info-detail">
+                            <div class="user-name-detail fw-bold">@LoginManager.GetUserName()</div>
+                            <div class="user-email tiny text-muted">@(LoginManager.CurrentUser?.Email ?? "user@example.com")</div>
+                        </div>
+                    </div>
+                    
+                    <div class="user-dropdown-divider"></div>
+                    
+                    <a href="/profile" class="user-dropdown-item py-2 px-3" @onclick="CloseDropdown">
+                        <i class="fa-regular fa-user me-2"></i>
+                        <span>Edit profile</span>
+                    </a>
+                    
+                    <div class="user-dropdown-divider"></div>
+                    
+                    <a href="/logout" class="user-dropdown-item user-dropdown-item-danger py-2 px-3">
+                        <i class="fa-solid fa-arrow-right-from-bracket me-2"></i>
+                        <span>Sign out</span>
+                    </a>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <a href="/login" class="btn btn-primary btn-sm px-4 rounded-pill">Log in</a>
+    }
+</div>
+
+@if (isDropdownOpen)
+{
+    <div class="user-dropdown-overlay" @onclick="CloseDropdown"></div>
+}
+
+@code {
+    private bool isDropdownOpen = false;
+
+    private void ToggleDropdown()
+    {
+        isDropdownOpen = !isDropdownOpen;
+    }
+
+    private void CloseDropdown()
+    {
+        isDropdownOpen = false;
+    }
+}

@@ -1,0 +1,99 @@
+@page "/users"
+@using EyeHospitalPOS.Controllers
+@using EyeHospitalPOS.Models
+@using EyeHospitalPOS.Helper
+@inject UserController UserController
+@inject LoginManager LoginManager
+@inject NavigationManager Navigation
+
+@attribute [Authorize(Roles = "Administrator,Manager")]
+
+<PageTitle>Users - Eye Hospital POS</PageTitle>
+
+<div class="page-container p-4">
+        <!-- Unified Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+             <div>
+                <h3 class="mb-1 fw-bold">User Management</h3>
+                <p class="text-muted tiny mb-0">Control system access and assign user roles</p>
+             </div>
+              <DxButton Text="Add New User"
+                        RenderStyle="ButtonRenderStyle.Primary"
+                        IconCssClass="fa-solid fa-user-plus"
+                        CssClass="premium-btn"
+                        Click="@(() => Navigation.NavigateTo("/users/new"))" />
+        </div>
+
+        <div class="premium-card overflow-hidden">
+            <div class="card-body p-0">
+                <DxGrid Data="@users"
+                        ShowFilterRow="false"
+                        ShowSearchBox="true"
+                        PageSize="20"
+                        CssClass="enterprise-grid">
+                    <Columns>
+                        <DxGridDataColumn FieldName="UserName" Caption="User" MinWidth="200">
+                             <CellDisplayTemplate>
+                                <div class="d-flex align-items-center">
+                                    <div class="bg-light rounded-circle p-2 me-3" style="width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;">
+                                        <i class="fa-solid fa-user text-primary"></i>
+                                    </div>
+                                    <div>
+                                        <div class="fw-bold">@context.Value</div>
+                                        <div class="tiny text-muted">@(((User)context.DataItem).Email)</div>
+                                    </div>
+                                </div>
+                            </CellDisplayTemplate>
+                        </DxGridDataColumn>
+                        <DxGridDataColumn FieldName="Role.Name" Caption="System Role" Width="150px">
+                             <CellDisplayTemplate>
+                                <span class="badge bg-light text-primary border fw-bold tiny">@context.Value</span>
+                            </CellDisplayTemplate>
+                        </DxGridDataColumn>
+                        <DxGridDataColumn FieldName="LastLoginDate" Caption="Last Activity" Width="180px">
+                             <CellDisplayTemplate>
+                                <span class="text-muted small">
+                                    @(((DateTime?)context.Value)?.ToString("MMM dd, HH:mm") ?? "Never")
+                                </span>
+                            </CellDisplayTemplate>
+                        </DxGridDataColumn>
+                         <DxGridDataColumn FieldName="IsActive" Caption="Status" Width="120px" HeaderCssClass="text-center" CssClass="text-center">
+                            <CellDisplayTemplate>
+                                <span class='trend-badge @((bool)context.Value ? "positive" : "negative")' style="min-width: 70px; justify-content: center;">
+                                    @((bool)context.Value ? "Active" : "Disabled")
+                                </span>
+                            </CellDisplayTemplate>
+                        </DxGridDataColumn>
+                        <DxGridDataColumn Caption="Actions" Width="120px" TextAlignment="GridTextAlignment.Center">
+                            <CellDisplayTemplate>
+                                <div class="d-flex gap-2 justify-content-center">
+                                    <DxButton Text="Edit"
+                                              RenderStyle="ButtonRenderStyle.Secondary" 
+                                              IconCssClass="fa-solid fa-pen-to-square"
+                                              SizeMode="SizeMode.Small"
+                                              CssClass="px-3"
+                                              Click="@(() => Navigation.NavigateTo($"/users/edit/{(context.DataItem as User).Id}"))" />
+                                </div>
+                            </CellDisplayTemplate>
+                        </DxGridDataColumn>
+                    </Columns>
+                </DxGrid>
+            </div>
+        </div>
+    </div>
+
+@code {
+    private List<User> users = new List<User>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Skip manual check as [Authorize] handles it
+        await LoadUsers();
+    }
+
+    private async Task LoadUsers()
+    {
+        users = await UserController.GetAllUsersAsync();
+    }
+}
+

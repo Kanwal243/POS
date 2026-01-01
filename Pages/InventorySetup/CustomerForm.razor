@@ -1,0 +1,259 @@
+@page "/customers/new"
+@page "/customers/{Id:int}"
+@using EyeHospitalPOS.Models
+@using EyeHospitalPOS.Helper
+@using EyeHospitalPOS.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject NavigationManager Navigation
+@inject LoginManager LoginManager
+@inject IJSRuntime JSRuntime
+
+<PageTitle>@(Id == 0 ? "New Customer" : CurrentCustomer.DisplayName) - Eye Hospital POS</PageTitle>
+
+@if (LoginManager.CurrentUser == null)
+{
+    <div class="alert alert-warning m-4">Please login to access this page.</div>
+}
+else
+{
+    <div class="page-container" style="padding-bottom: 80px;">
+        
+        <!-- Sticky Toolbar -->
+        <div class="sticky-top d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-3">
+                <DxButton RenderStyle="ButtonRenderStyle.Secondary" 
+                          IconCssClass="fa-solid fa-arrow-left" 
+                          SizeMode="SizeMode.Small"
+                          CssClass="btn-toolbar"
+                          Click="@(() => Navigation.NavigateTo("/customer"))" />
+                
+                <div>
+                    <h5 class="mb-0 fw-bold">@(Id == 0 ? "New Customer" : CurrentCustomer.DisplayName)</h5>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge @(CurrentCustomer.IsActive ? "bg-success" : "bg-secondary") text-white">
+                            @(CurrentCustomer.IsActive ? "Active" : "Inactive")
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="toolbar-actions">
+                <DxButton Text="Save" 
+                          RenderStyle="ButtonRenderStyle.Success" 
+                          IconCssClass="fa-solid fa-floppy-disk"
+                          SizeMode="SizeMode.Small"
+                          CssClass="btn-toolbar"
+                          Click="SaveCustomer" />
+                
+                @if (Id != 0)
+                {
+                    <DxButton Text="Delete" 
+                              RenderStyle="ButtonRenderStyle.Danger" 
+                              RenderStyleMode="ButtonRenderStyleMode.Outline"
+                              IconCssClass="fa-solid fa-trash"
+                              SizeMode="SizeMode.Small"
+                              CssClass="btn-toolbar"
+                              Click="DeleteCustomer" />
+                }
+            </div>
+        </div>
+
+        <!-- Customer Information Form -->
+        <div class="premium-card mt-3 mx-4">
+            <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; padding: 0.75rem 1.25rem;">
+                <h6 class="text-white mb-0 fw-semibold">Customer Information</h6>
+            </div>
+            <div class="card-body p-4" style="background-color: #f8f9fa;">
+                <DxFormLayout Data="@CurrentCustomer" ItemSpacing="10px" CaptionPosition="CaptionPosition.Horizontal">
+                    <DxFormLayoutGroup ColSpanLg="12">
+                        <!-- Row 1: First Name and Last Name -->
+                        <DxFormLayoutItem Caption="First Name:" ColSpanLg="6" ColSpanMd="12">
+                            <DxTextBox @bind-Text="@CurrentCustomer.FirstName" 
+                                       EnableValidation="false" />
+                        </DxFormLayoutItem>
+                        <DxFormLayoutItem Caption="Last Name:" ColSpanLg="6" ColSpanMd="12">
+                            <DxTextBox @bind-Text="@CurrentCustomer.LastName" 
+                                       EnableValidation="false" />
+                        </DxFormLayoutItem>
+                        
+                        <!-- Row 2: Display Name and Phone -->
+                        <DxFormLayoutItem Caption="Display Name:" ColSpanLg="6" ColSpanMd="12">
+                            <DxTextBox @bind-Text="@CurrentCustomer.DisplayName" 
+                                       NullText="e.g. John Doe"
+                                       EnableValidation="false" />
+                        </DxFormLayoutItem>
+                        <DxFormLayoutItem Caption="Phone Number:" ColSpanLg="6" ColSpanMd="12">
+                            <DxTextBox @bind-Text="@CurrentCustomer.Phone" 
+                                       EnableValidation="false" />
+                        </DxFormLayoutItem>
+                        
+                        <!-- Row 3: Birthday and Email -->
+                        <DxFormLayoutItem Caption="Birthday:" ColSpanLg="6" ColSpanMd="12">
+                            <DxDateEdit @bind-Date="@CurrentCustomer.Birthday" 
+                                        EnableValidation="false" />
+                        </DxFormLayoutItem>
+                        <DxFormLayoutItem Caption="Email:" ColSpanLg="6" ColSpanMd="12">
+                            <DxTextBox @bind-Text="@CurrentCustomer.Email" 
+                                       EnableValidation="false" />
+                        </DxFormLayoutItem>
+                        
+                        <!-- Row 5: Status Checkboxes (full width) -->
+                        <DxFormLayoutItem Caption="Status:" ColSpanLg="12">
+                            <div class="d-flex gap-4">
+                                <DxCheckBox @bind-Checked="@CurrentCustomer.IsActive">
+                                    <span class="tiny fw-bold text-muted">Active Status</span>
+                                </DxCheckBox>
+                                
+                            </div>
+                        </DxFormLayoutItem>
+                    </DxFormLayoutGroup>
+                </DxFormLayout>
+            </div>
+        </div>
+
+        <!-- Address Information -->
+        <div class="premium-card mt-3 mx-4">
+            <div class="card-header bg-light py-2 d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fa-solid fa-location-dot text-danger"></i>
+                    <span class="fw-bold text-dark">Address Information</span>
+                </div>
+            </div>
+            
+            <div class="card-body p-4" style="background-color: #f8f9fa;">
+                <DxFormLayout Data="@CurrentCustomer" ItemSpacing="10px" CaptionPosition="CaptionPosition.Horizontal">
+                    <DxFormLayoutGroup ColSpanLg="12">
+                        <!-- Row 1: Address (full width) -->
+                        <DxFormLayoutItem Caption="Address:" ColSpanLg="12">
+                            <DxMemo @bind-Text="@CurrentCustomer.AddressLine1" 
+                                    Rows="3"
+                                    EnableValidation="false"
+                                    CssClass="bg-white" />
+                        </DxFormLayoutItem>
+                    </DxFormLayoutGroup>
+                </DxFormLayout>
+            </div>
+        </div>
+
+        @if (Id != 0)
+        {
+            <!-- Related Tabs Section -->
+            <div class="premium-card mt-3 mx-4">
+                <div class="card-header bg-light py-2">
+                    <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active" data-bs-toggle="tab" href="#invoices">
+                                <i class="fa-solid fa-file-invoice me-2"></i>Invoices
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#phone-numbers">
+                                <i class="fa-solid fa-phone me-2"></i>Phone Numbers
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="card-body p-0">
+                    <div class="tab-content">
+                        <div class="tab-pane fade show active p-3" id="invoices">
+                            <p class="text-muted">Invoices for this customer will appear here.</p>
+                        </div>
+                        <div class="tab-pane fade p-3" id="phone-numbers">
+                            <p class="text-muted">Additional phone numbers will appear here.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    
+    private Customer CurrentCustomer = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (LoginManager.CurrentUser == null)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        if (Id != 0)
+        {
+            var existing = await DbContext.Customers.FindAsync(Id);
+            if (existing != null)
+            {
+                CurrentCustomer = existing;
+            }
+            else
+            {
+                Navigation.NavigateTo("/customer");
+            }
+        }
+        else
+        {
+            CurrentCustomer.IsActive = false;
+            CurrentCustomer.ShowInSelectionList = true;
+        }
+    }
+
+    private async Task SaveCustomer()
+    {
+        // Validation
+        if (string.IsNullOrWhiteSpace(CurrentCustomer.DisplayName))
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Display name is required.");
+            return;
+        }
+
+        try
+        {
+            if (Id == 0)
+            {
+                await DbContext.Customers.AddAsync(CurrentCustomer);
+            }
+            else
+            {
+                DbContext.Customers.Update(CurrentCustomer);
+            }
+
+            await DbContext.SaveChangesAsync();
+            await JSRuntime.InvokeVoidAsync("alert", "Customer saved successfully!");
+            Navigation.NavigateTo("/customer");
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error saving customer: {ex.Message}");
+        }
+    }
+
+    private async Task DeleteCustomer()
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to delete this customer?"))
+            return;
+
+        try
+        {
+            var hasSales = await DbContext.Sales.AnyAsync(s => s.CustomerId == CurrentCustomer.Id);
+            if (hasSales)
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "Cannot delete customer because they have sale history. Please deactivate instead.");
+                return;
+            }
+
+            DbContext.Customers.Remove(CurrentCustomer);
+            await DbContext.SaveChangesAsync();
+            await JSRuntime.InvokeVoidAsync("alert", "Customer deleted successfully!");
+            Navigation.NavigateTo("/customer");
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error deleting customer: {ex.Message}");
+        }
+    }
+}

@@ -1,0 +1,68 @@
+@using System.ComponentModel.DataAnnotations
+@inject IJSRuntime JS
+
+<div class="barcode-preview-container">
+    @if (ShowPreview && !string.IsNullOrEmpty(BarcodeValue))
+    {
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4 text-center">
+                <h6 class="mb-3 fw-bold text-muted">Barcode Preview</h6>
+                
+                @if (BarcodeType == BarcodeTypeEnum.Code128)
+                {
+                    <svg id="@($"barcode-{BarcodeValue}")" style="max-width: 100%; height: auto;"></svg>
+                }
+                else if (BarcodeType == BarcodeTypeEnum.QRCode)
+                {
+                    <div id="@($"qrcode-{BarcodeValue}")" style="display: flex; justify-content: center; align-items: center;"></div>
+                }
+                
+                <small class="text-muted d-block mt-3">
+                    <i class="fa-solid fa-barcode me-1"></i>@BarcodeValue
+                </small>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string BarcodeValue { get; set; } = string.Empty;
+
+    [Parameter]
+    public BarcodeTypeEnum BarcodeType { get; set; } = BarcodeTypeEnum.Code128;
+
+    [Parameter]
+    public bool ShowPreview { get; set; } = true;
+
+    [Parameter]
+    public int QRCodeSize { get; set; } = 200;
+
+    public enum BarcodeTypeEnum
+    {
+        Code128,
+        QRCode
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!string.IsNullOrEmpty(BarcodeValue))
+        {
+            try
+            {
+                if (BarcodeType == BarcodeTypeEnum.Code128)
+                {
+                    await JS.InvokeVoidAsync("BarcodeScanner.generateBarcode", BarcodeValue, $"barcode-{BarcodeValue}");
+                }
+                else if (BarcodeType == BarcodeTypeEnum.QRCode)
+                {
+                    await JS.InvokeVoidAsync("BarcodeScanner.generateQRCode", BarcodeValue, $"qrcode-{BarcodeValue}", QRCodeSize);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error rendering barcode: {ex.Message}");
+            }
+        }
+    }
+}

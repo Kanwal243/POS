@@ -1,0 +1,76 @@
+@page "/product-types"
+@using EyeHospitalPOS.Models
+@using EyeHospitalPOS.Helper
+@using EyeHospitalPOS.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject LoginManager LoginManager
+@inject NavigationManager Navigation
+
+<PageTitle>Product Types - Eye Hospital POS</PageTitle>
+
+@if (LoginManager.CurrentUser == null)
+{
+    <div class="alert alert-warning m-4">Please login to access this page.</div>
+}
+else
+{
+    <div class="page-container p-4">
+         <!-- Unified Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+             <div>
+                <h3 class="mb-1 fw-bold">Product Types</h3>
+                <p class="text-muted tiny mb-0">Define specific classifications for your inventory items</p>
+             </div>
+             <DxButton Text="Add New Type"
+                       RenderStyle="ButtonRenderStyle.Primary"
+                       IconCssClass="fa-solid fa-plus"
+                       CssClass="premium-btn"
+                       Click="@(() => Navigation.NavigateTo("/product-types/new"))" />
+        </div>
+
+        <div class="premium-card overflow-hidden">
+            <div class="card-body p-0">
+                <DxGrid Data="@types"
+                        ShowFilterRow="false"
+                        ShowSearchBox="true"
+                        PageSize="20"
+                        CssClass="enterprise-grid">
+                    <Columns>
+                        <DxGridDataColumn FieldName="Name" Caption="Type Name" MinWidth="200">
+                            <CellDisplayTemplate>
+                                <div class="d-flex align-items-center">
+                                    <div class="bg-light rounded p-2 me-3" style="width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;">
+                                        <i class="fa-solid fa-tag text-primary"></i>
+                                    </div>
+                                    <span class="fw-bold">@context.Value</span>
+                                </div>
+                            </CellDisplayTemplate>
+                        </DxGridDataColumn>
+                    </Columns>
+                </DxGrid>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<ProductType> types = new List<ProductType>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (LoginManager.CurrentUser == null)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        await LoadTypes();
+    }
+
+    private async Task LoadTypes()
+    {
+        types = await DbContext.ProductTypes.ToListAsync();
+    }
+}
+

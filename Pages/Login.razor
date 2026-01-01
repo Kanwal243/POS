@@ -1,0 +1,300 @@
+﻿@page "/login"
+@layout EyeHospitalPOS.Shared.EmptyLayout
+@using EyeHospitalPOS.Controllers
+@using EyeHospitalPOS.Models
+@using EyeHospitalPOS.Helper
+@using EyeHospitalPOS.Services
+@inject LoginManager LoginManager
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@inject LoginController LoginController
+
+<div class="login-wrapper">
+    <div class="theme-toggle-wrapper">
+        <label class="theme-switcher">
+            <input type="checkbox" checked="@isDarkMode" @onchange="ToggleTheme" />
+            <span class="slider">
+                <span class="icon sun"><i class="fa-solid fa-sun"></i></span>
+                <span class="icon moon"><i class="fa-solid fa-moon"></i></span>
+            </span>
+        </label>
+    </div>
+
+    <div class="login-container">
+        <div class="login-form-section">
+            <div class="form-content">
+                <div class="mb-4">
+                    <h2 class="auth-title">Sign In</h2>
+                    <p class="auth-subtitle">Enter your username and password to sign in!</p>
+                </div>
+
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="alert alert-danger mb-4">@errorMessage</div>
+                }
+
+                <div class="form-group mb-3">
+                    <label class="form-label">Username</label>
+                    <div class="input-group-custom">
+                        <span class="input-icon fa-regular fa-envelope"></span>
+                        <input type="text" class="form-control-custom" @bind="username" placeholder="Enter username" />
+                    </div>
+                </div>
+
+                <div class="form-group mb-4">
+                    <label class="form-label">Password</label>
+                    <div class="input-group-custom">
+                        <span class="input-icon fa-solid fa-lock"></span>
+                        <input type="password" class="form-control-custom" @bind="password" placeholder="Enter password" />
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-block w-100 sign-in-btn" @onclick="HandleLogin" disabled="@isProcessing">
+                    @if (isProcessing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        <span>Signing In...</span>
+                    }
+                    else
+                    {
+                        <span>Sign In</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string username = string.Empty;
+    private string password = string.Empty;
+    private string errorMessage = string.Empty;
+    private bool isProcessing = false;
+    private bool isDarkMode = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var theme = await JSRuntime.InvokeAsync<string>("getTheme");
+            isDarkMode = theme == "dark";
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleTheme()
+    {
+        isDarkMode = !isDarkMode;
+        await JSRuntime.InvokeVoidAsync("setTheme", isDarkMode ? "dark" : "light");
+    }
+
+    private async Task HandleLogin()
+    {
+        if (isProcessing) return;
+
+        try
+        {
+            isProcessing = true;
+            errorMessage = string.Empty;
+
+            // Call controller / API to validate user
+            var (success, user, token, refreshToken, error) = await LoginController.LoginAsync(username, password);
+
+            if (!success || user == null)
+            {
+                errorMessage = error ?? "Invalid username or password";
+                return;
+            }
+
+            // Store user info and tokens in LoginManager
+            LoginManager.CurrentUser = user;
+            LoginManager.AuthToken = token;
+            LoginManager.RefreshToken = refreshToken;
+            
+            // Persist to session storage via Browser Fetch (Critical for Cookie/Session persistence)
+            // This calls the server endpoint /api/Auth/set-session carrying the browser cookies
+            try 
+            {
+                var sessionRequest = new { User = user, Token = token, RefreshToken = refreshToken };
+                await JSRuntime.InvokeVoidAsync("saveSession", "/api/Auth/set-session", sessionRequest);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"JS Session Save Failed: {ex.Message}");
+            }
+            
+            // Also attempt server-side save (might fail in SignalR but good practice if it works)
+            await LoginManager.SaveUserAsync();
+
+            // Notify AuthenticationStateProvider to update UI state
+            // AuthProvider.NotifyUserAuthentication(user);
+
+            // Redirect after login (Force Reload to trigger Middleware Auth)
+            if (user.ChangePasswordOnLogin)
+            {
+                Navigation.NavigateTo("/change-password", true);
+            }
+            else
+            {
+                var redirectPath = LoginController.GetRedirectPath(user);
+                Navigation.NavigateTo(redirectPath, true);
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"System Error: {ex.Message}";
+            Console.WriteLine(ex);
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+}
+
+<style>
+    .form-content {
+        max-width: 400px;
+        margin: 0 auto;
+        width: 100%;
+    }
+
+    .input-group-custom {
+        position: relative;
+    }
+
+    .input-icon {
+        position: absolute;
+        left: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #94a3b8;
+        font-size: 1.1rem;
+        z-index: 10;
+    }
+
+    .forgot-password {
+        font-size: 0.9rem;
+        color: #3c50e0;
+        text-decoration: none;
+        font-weight: 500;
+    }
+    
+    .forgot-password:hover {
+        text-decoration: underline;
+    }
+
+    .sign-in-btn {
+        background-color: #3c50e0;
+        border-color: #3c50e0;
+        padding: 0.75rem;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: background-color 0.2s;
+    }
+
+    .branding-content {
+        position: relative;
+        z-index: 2;
+    }
+
+    .brand-description {
+        font-size: 1.1rem;
+        color: #cbd5e1;
+        line-height: 1.6;
+    }
+
+    @@media (max-width: 991.98px) {
+        .login-container {
+            flex-direction: column;
+            max-width: 500px;
+            min-height: auto;
+        }
+
+        .branding-section {
+            display: none;
+        }
+    }
+
+    /* TailAdmin Style Theme Toggle */
+    .theme-toggle-wrapper {
+        position: absolute;
+        top: 30px;
+        right: 30px;
+        z-index: 100;
+    }
+
+    .theme-switcher {
+        position: relative;
+        display: inline-block;
+        width: 64px;
+        height: 32px;
+    }
+
+    .theme-switcher input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #E2E8F0;
+        transition: .4s;
+        border-radius: 34px;
+        display: flex;
+        align-items: center;
+        padding: 0 4px;
+    }
+
+    [data-theme='dark'] .slider {
+        background-color: #313D4A;
+    }
+
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 24px;
+        width: 24px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+        z-index: 2;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    input:checked + .slider:before {
+        transform: translateX(32px);
+    }
+
+    .icon {
+        flex: 1;
+        text-align: center;
+        font-size: 14px;
+        z-index: 1;
+        transition: .4s;
+    }
+
+    .sun {
+        color: #FACC15;
+    }
+
+    .moon {
+        color: #94A3B8;
+    }
+
+    [data-theme='dark'] .sun {
+        color: #64748B;
+    }
+
+    [data-theme='dark'] .moon {
+        color: #F1F5F9;
+    }
+</style>

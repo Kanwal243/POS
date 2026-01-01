@@ -1,0 +1,432 @@
+@page "/info"
+@page "/info/{Mode}"
+@using EyeHospitalPOS.Helper
+@using EyeHospitalPOS.Models
+@using EyeHospitalPOS.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject LoginManager LoginManager
+@inject NavigationManager Navigation
+
+@attribute [Authorize(Roles = "Administrator")]
+
+<PageTitle>Organization Settings - Eye Hospital POS</PageTitle>
+
+<div class="page-container p-4">
+    <!-- Unified Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex align-items-center gap-3">
+            @if (isEditMode)
+            {
+                <DxButton RenderStyle="ButtonRenderStyle.Secondary" 
+                          IconCssClass="fa-solid fa-arrow-left" 
+                          SizeMode="SizeMode.Small"
+                          CssClass="btn-toolbar"
+                          Click="@CancelEdit" />
+            }
+            <div>
+                <h3 class="mb-1 fw-bold">Organization Settings</h3>
+                <p class="text-muted tiny mb-0">Configure your hospital profile and global system preferences</p>
+            </div>
+        </div>
+        <div class="toolbar-actions">
+            @if (!isEditMode)
+            {
+                <DxButton Text="Edit Configuration"
+                          RenderStyle="ButtonRenderStyle.Primary"
+                          IconCssClass="fa-solid fa-pen-to-square"
+                          SizeMode="SizeMode.Small"
+                          CssClass="btn-toolbar"
+                          Click="@(() => Navigation.NavigateTo("/info/edit"))" />
+            }
+            else
+            {
+                <DxButton Text="Save Settings"
+                          RenderStyle="ButtonRenderStyle.Success"
+                          IconCssClass="fa-solid fa-floppy-disk"
+                          SizeMode="SizeMode.Small"
+                          CssClass="btn-toolbar"
+                          SubmitForm="true" />
+            }
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="d-flex flex-column align-items-center justify-content-center p-5">
+            <div class="spinner-border text-primary mb-3" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="text-muted">Loading organization settings...</p>
+        </div>
+    }
+    else if (showError)
+    {
+        <div class="alert alert-danger m-5 shadow-sm d-flex align-items-center">
+            <i class="fa-solid fa-triangle-exclamation fs-3 me-3"></i>
+            <div>
+                <h5 class="alert-heading fw-bold mb-1">Configuration Error</h5>
+                <p class="mb-0">@errorMessage</p>
+                <hr>
+                <p class="mb-0 small">Please ensure database migrations are applied. Run: <code>dotnet ef database update</code></p>
+            </div>
+        </div>
+    }
+    else
+    {
+        <EditForm Model="@organization" OnValidSubmit="SaveChanges">
+            <DataAnnotationsValidator />
+            <div class="row g-4">
+                <!-- Left Side: Basic Info -->
+                <div class="col-lg-7">
+                    <div class="premium-card h-100">
+                        <div class="premium-header text-white p-4">
+                            <div class="d-flex align-items-center">
+                                <div class="premium-header-badge me-4 text-white">
+                                    <i class="fa-solid fa-hospital fs-4"></i>
+                                </div>
+                                <div>
+                                    <h5 class="fw-bold mb-0 text-white">Hospital Profile</h5>
+                                    <p class="mb-0 text-white-50 small">Basic identification and contact details</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <div class="form-group-custom">
+                                        <label class="form-label-custom">Organization Name</label>
+                                        @if (isEditMode)
+                                        {
+                                            <DxTextBox @bind-Text="@organization.Name" 
+                                                       ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto" />
+                                            <ValidationMessage For="@(() => organization.Name)" />
+                                        }
+                                        else
+                                        {
+                                            <div class="info-value p-3 rounded-3 fw-bold fs-5"
+                                                 style="background-color: var(--bg-hover); border-left: 4px solid var(--primary-color);">
+                                                @organization.Name
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+
+                                <div class="col-12">
+                                    <div class="form-group-custom mt-3">
+                                        <label class="form-label-custom">Physical Address</label>
+                                        @if (isEditMode)
+                                        {
+                                            <DxTextBox @bind-Text="@organization.Address" />
+                                        }
+                                        else
+                                        {
+                                            <div style="color: var(--text-main);">
+                                                <i class="fa-solid fa-location-dot me-3 text-muted"></i>@(organization.Address ?? "Not set")
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6 mt-3">
+                                    <div class="form-group-custom">
+                                        <label class="form-label-custom">Phone Number</label>
+                                        @if (isEditMode)
+                                        {
+                                            <DxTextBox @bind-Text="@organization.Phone" />
+                                        }
+                                        else
+                                        {
+                                            <div style="color: var(--text-main);">
+                                                <i class="fa-solid fa-phone me-3 text-muted"></i>@(organization.Phone ?? "Not set")
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6 mt-3">
+                                    <div class="form-group-custom">
+                                        <label class="form-label-custom">Email Address</label>
+                                        @if (isEditMode)
+                                        {
+                                            <DxTextBox @bind-Text="@organization.Email" />
+                                            <ValidationMessage For="@(() => organization.Email)" />
+                                        }
+                                        else
+                                        {
+                                            <div style="color: var(--text-main);">
+                                                <i class="fa-solid fa-envelope me-3 text-muted"></i>@(organization.Email ?? "Not set")
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6 mt-3">
+                                    <div class="form-group-custom">
+                                        <label class="form-label-custom">Tax ID / VAT Number</label>
+                                        @if (isEditMode)
+                                        {
+                                            <DxTextBox @bind-Text="@organization.TaxId" />
+                                        }
+                                        else
+                                        {
+                                            <div style="color: var(--text-main);">@(organization.TaxId ?? "Not set")</div>
+                                        }
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6 mt-3">
+                                    <div class="form-group-custom">
+                                        <label class="form-label-custom">Medical License No.</label>
+                                        @if (isEditMode)
+                                        {
+                                            <DxTextBox @bind-Text="@organization.LicenseNumber" />
+                                        }
+                                        else
+                                        {
+                                            <div style="color: var(--text-main);">@(organization.LicenseNumber ?? "Not set")</div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Side: System Prefs -->
+                <div class="col-lg-5">
+                    <div class="premium-card h-100">
+                        <div class="premium-header-alt text-white p-4">
+                            <div class="d-flex align-items-center">
+                                <div class="premium-header-badge me-4 text-white">
+                                    <i class="fa-solid fa-sliders fs-4"></i>
+                                </div>
+                                <div>
+                                    <h5 class="fw-bold mb-0 text-white">System Preferences</h5>
+                                    <p class="mb-0 text-white-50 small">Regional and localization settings</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="row g-4">
+                                <div class="col-12">
+                                    <div class="form-group-custom">
+                                        <label class="form-label-custom">Base Currency</label>
+                                        @if (isEditMode)
+                                        {
+                                            <DxComboBox Data="@currencies" @bind-Value="@organization.Currency" />
+                                        }
+                                        else
+                                        {
+                                            <div class="d-flex align-items-center info-row p-3 rounded-3 shadow-sm">
+                                                <div class="pref-icon text-primary me-4 d-flex align-items-center justify-content-center" style="width: 32px;">
+                                                    <i class="fa-solid fa-money-bill-1 fs-5"></i>
+                                                </div>
+                                                <span class="fw-bold" style="color: var(--text-main);">@organization.Currency</span>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+
+                                <div class="col-12 mt-2">
+                                    <div class="form-group-custom">
+                                        <label class="form-label-custom">System Time Zone</label>
+                                        @if (isEditMode)
+                                        {
+                                            <div class="premium-input-field">
+                                                <i class="fa-solid fa-clock icon"></i>
+                                                <DxComboBox Data="@timeZones" @bind-Value="@organization.TimeZone" />
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="d-flex align-items-center info-row p-3 rounded-3 shadow-sm">
+                                                <div class="pref-icon text-info me-4 d-flex align-items-center justify-content-center" style="width: 32px;">
+                                                    <i class="fa-solid fa-earth-americas fs-5"></i>
+                                                </div>
+                                                <span class="fw-bold" style="color: var(--text-main);">@organization.TimeZone</span>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+
+                                <div class="col-12 mt-2">
+                                    <div class="form-group-custom">
+                                        <label class="form-label-custom">Primary Date Format</label>
+                                        @if (isEditMode)
+                                        {
+                                            <div class="premium-input-field">
+                                                <i class="fa-solid fa-calendar-days icon"></i>
+                                                <DxComboBox Data="@dateFormats" @bind-Value="@organization.DateFormat" />
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="d-flex align-items-center info-row p-3 rounded-3 shadow-sm">
+                                                <div class="pref-icon text-warning me-4 d-flex align-items-center justify-content-center" style="width: 32px;">
+                                                    <i class="fa-solid fa-calendar-check fs-5"></i>
+                                                </div>
+                                                <span class="fw-bold" style="color: var(--text-main);">@organization.DateFormat</span>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="p-3 rounded-3 mt-4"
+                                 style="background-color: var(--bg-hover); border: 1px solid var(--border-color);">
+                                <div class="d-flex align-items-center mb-2" style="color: var(--info-color);">
+                                    <i class="fa-solid fa-circle-info me-2"></i>
+                                    <span class="fw-bold small">Audit Note</span>
+                                </div>
+                                <p class="tiny text-muted mb-0">Changes to system preferences may affect financial reporting and document generation historical data.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </EditForm>
+    }
+</div>
+
+@if (showSuccess)
+{
+    <div class="alert alert-success position-fixed top-0 start-50 translate-middle-x mt-4 shadow-lg z-3" style="min-width: 300px;">
+        <i class="fa-solid fa-circle-check me-2"></i> Configuration saved successfully!
+    </div>
+}
+
+<style>
+    .premium-header, .premium-header-alt {
+        background: var(--primary-color);
+        border-radius: 12px 12px 0 0 !important;
+    }
+
+    .premium-header .premium-header-badge, 
+    .premium-header-alt .premium-header-badge {
+        width: 54px;
+        height: 54px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 16px;
+        backdrop-filter: blur(4px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+        color: white !important;
+    }
+
+    .premium-header .premium-header-badge i, 
+    .premium-header-alt .premium-header-badge i {
+        color: white !important;
+        opacity: 1 !important;
+    }
+
+    .form-group-custom { margin-bottom: 0.5rem; }
+    .form-label-custom {
+        font-weight: 700;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.6rem;
+        display: block;
+    }
+
+    .info-row {
+        background-color: var(--bg-hover);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+        transition: background-color 0.2s, border-color 0.2s;
+    }
+
+    .info-row:hover { 
+        background-color: var(--bg-card);
+        border-color: var(--primary-color);
+    }
+</style>
+
+@code {
+    [Parameter] public string? Mode { get; set; }
+    private Organization organization = new Organization();
+    private bool isEditMode => Mode?.ToLower() == "edit";
+    private bool showSuccess = false;
+    private bool showError = false;
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+
+    private readonly List<string> currencies = new() { "USD ($)", "EUR (€)", "GBP (£)", "INR (₹)", "JPY (¥)", "AUD ($)","PKR (₨)" };
+    private readonly List<string> timeZones = new() { "UTC-5 (Eastern Time)", "UTC-8 (Pacific Time)", "UTC+0 (London)", "UTC+1 (Berlin)", "UTC+5:30 (Mumbai)" };
+    private readonly List<string> dateFormats = new() { "MM/DD/YYYY", "DD/MM/YYYY", "YYYY-MM-DD" };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrganization();
+    }
+
+    private async Task LoadOrganization()
+    {
+        try
+        {
+            isLoading = true;
+            showError = false;
+            var existingOrg = await DbContext.Organizations.FirstOrDefaultAsync();
+            
+            if (existingOrg != null)
+            {
+                organization = existingOrg;
+            }
+            else
+            {
+                // Create default if not exists
+                organization = new Organization
+                {
+                    Name = "Eye Hospital POS",
+                    Currency = "USD ($)",
+                    TimeZone = "UTC-5 (Eastern Time)",
+                    DateFormat = "MM/DD/YYYY"
+                };
+                DbContext.Organizations.Add(organization);
+                await DbContext.SaveChangesAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Failed to load organization settings. " + ex.Message;
+            showError = true;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveChanges()
+    {
+        try
+        {
+            if (organization != null)
+            {
+                DbContext.Organizations.Update(organization);
+                await DbContext.SaveChangesAsync();
+                
+                showSuccess = true;
+                StateHasChanged();
+                
+                await Task.Delay(2000);
+                showSuccess = false;
+                Navigation.NavigateTo("/info");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving organization: {ex.Message}");
+        }
+    }
+
+    private void CancelEdit()
+    {
+        Navigation.NavigateTo("/info");
+    }
+}

@@ -1,0 +1,168 @@
+@page "/item-locations/new"
+@page "/item-locations/{Id:int}"
+@using EyeHospitalPOS.Models
+@using EyeHospitalPOS.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject NavigationManager Navigation
+@inject EyeHospitalPOS.Helper.LoginManager LoginManager
+
+<PageTitle>@(Id == 0 ? "New Location" : CurrentLocation.Name) - Item Locations</PageTitle>
+
+@if (LoginManager.CurrentUser == null)
+{
+    <div class="alert alert-warning m-4">Please login to access this page.</div>
+}
+else
+{
+    <div class="page-container p-4">
+        <!-- Toolbar -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div class="d-flex align-items-center gap-3">
+                <DxButton RenderStyle="ButtonRenderStyle.Secondary"
+                          IconCssClass="fa-solid fa-arrow-left"
+                          SizeMode="SizeMode.Small"
+                          CssClass="btn-toolbar"
+                          Click="@(() => Navigation.NavigateTo("/item-locations"))" />
+                <div>
+                    <h3 class="mb-1 fw-bold">@(Id == 0 ? "New Location" : "Edit Location")</h3>
+                    <p class="text-muted tiny mb-0">@(Id == 0 ? "Create a new storage location" : $"Editing {CurrentLocation.Name}")</p>
+                </div>
+            </div>
+            <div class="toolbar-actions">
+                <DxButton Text="Save Location"
+                          RenderStyle="ButtonRenderStyle.Success"
+                          IconCssClass="fa-solid fa-floppy-disk"
+                          SizeMode="SizeMode.Small"
+                          CssClass="btn-toolbar"
+                          Click="SaveLocation" />
+            </div>
+        </div>
+
+        <div class="premium-card">
+            <div class="card-header bg-light py-2">
+                <h6 class="mb-0 fw-bold">Location Details</h6>
+            </div>
+            <div class="card-body p-4">
+                <DxFormLayout Data="@CurrentLocation" ItemSpacing="15px">
+                    <DxFormLayoutGroup ColSpanLg="12" CaptionPosition="CaptionPosition.Vertical">
+                        <DxFormLayoutItem Caption="Location Name:" ColSpanMd="6">
+                            <DxTextBox @bind-Text="@CurrentLocation.Name" />
+                        </DxFormLayoutItem>
+                        <DxFormLayoutItem Caption="Location Code:" ColSpanMd="6">
+                            <DxTextBox @bind-Text="@CurrentLocation.Code" />
+                        </DxFormLayoutItem>
+                         <DxFormLayoutItem Caption="Description:" ColSpanMd="12">
+                            <DxTextBox @bind-Text="@CurrentLocation.Description" />
+                        </DxFormLayoutItem>
+                        <DxFormLayoutItem Caption="Location Parent:" ColSpanMd="6">
+                            <DxComboBox Data="@ParentLocations"
+                                        @bind-Value="@CurrentLocation.ParentId"
+                                        ValueFieldName="Id"
+                                        TextFieldName="Name"
+                                        ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto"
+                                        NullText="Select Parent Location (Optional)" />
+                        </DxFormLayoutItem>
+                         <DxFormLayoutItem ColSpanMd="6" Context="isActiveContext">
+                            <div class="pt-4">
+                                <DxCheckBox @bind-Checked="@CurrentLocation.IsActive">Active Status</DxCheckBox>
+                            </div>
+                        </DxFormLayoutItem>
+                    </DxFormLayoutGroup>
+                </DxFormLayout>
+            </div>
+            
+            @if (Id != 0)
+            {
+                <div class="card-body p-0 border-top">
+                    <DxTabs RenderMode="TabsRenderMode.AllTabs">
+                        <DxTabPage Text="Child Locations">
+                            <div class="p-3">
+                                <DxGrid Data="@ChildLocations" PageSize="10" CssClass="enterprise-grid">
+                                    <Columns>
+                                        <DxGridDataColumn FieldName="Name" Caption="Location Name" />
+                                        <DxGridDataColumn FieldName="Code" Caption="Code" />
+                                        <DxGridDataColumn FieldName="Description" Caption="Description" />
+                                    </Columns>
+                                </DxGrid>
+                            </div>
+                        </DxTabPage>
+                        <DxTabPage Text="Products">
+                            <div class="p-3">
+                                <DxGrid Data="@ProductStock" PageSize="10" CssClass="enterprise-grid">
+                                    <Columns>
+                                        <DxGridDataColumn FieldName="Product.Name" Caption="Product Name" />
+                                        <DxGridDataColumn FieldName="Product.Barcode" Caption="Barcode" />
+                                        <DxGridDataColumn FieldName="StockQuantity" Caption="Quantity in Location" />
+                                    </Columns>
+                                </DxGrid>
+                            </div>
+                        </DxTabPage>
+                    </DxTabs>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    
+    private ItemLocation CurrentLocation = new ItemLocation();
+    private List<ItemLocation> AllLocations = new List<ItemLocation>();
+    private List<ItemLocation> ParentLocations => AllLocations.Where(l => l.Id != CurrentLocation.Id).ToList(); // Prevent self-referencing
+    
+    // For tabs
+    private List<ItemLocation> ChildLocations => AllLocations.Where(l => l.ParentId == CurrentLocation.Id).ToList();
+    private List<ProductLocation> ProductStock = new List<ProductLocation>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (LoginManager.CurrentUser == null)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        AllLocations = await DbContext.ItemLocations.ToListAsync();
+
+        if (Id != 0)
+        {
+            var existing = await DbContext.ItemLocations
+                .Include(l => l.ProductLocations)
+                .ThenInclude(pl => pl.Product)
+                .FirstOrDefaultAsync(l => l.Id == Id);
+                
+            if (existing != null)
+            {
+                CurrentLocation = existing;
+                if (CurrentLocation.ProductLocations != null)
+                {
+                    ProductStock = CurrentLocation.ProductLocations.ToList();
+                }
+            }
+        }
+    }
+
+    private async Task SaveLocation()
+    {
+        if (string.IsNullOrWhiteSpace(CurrentLocation.Name)) return;
+
+        if (Id == 0)
+        {
+            await DbContext.ItemLocations.AddAsync(CurrentLocation);
+        }
+        else
+        {
+            DbContext.ItemLocations.Update(CurrentLocation);
+        }
+
+        await DbContext.SaveChangesAsync();
+        Navigation.NavigateTo("/item-locations");
+    }
+}

@@ -1,0 +1,249 @@
+@page "/profile"
+@using EyeHospitalPOS.Models
+@using EyeHospitalPOS.Data
+@using Microsoft.EntityFrameworkCore
+@inject EyeHospitalPOS.Helper.LoginManager LoginManager
+@inject ApplicationDbContext DbContext
+@inject NavigationManager Navigation
+
+<PageTitle>Profile - EyeCare POS</PageTitle>
+
+<div class="page-container p-4">
+    <!-- Unified Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+         <div>
+            <h3 class="mb-1 fw-bold">My Profile</h3>
+            <p class="text-muted tiny mb-0">Manage your profile details and view roles</p>
+         </div>
+         <nav aria-label="breadcrumb" class="d-none d-md-block">
+            <ol class="breadcrumb mb-0 tiny fw-bold text-uppercase">
+                <li class="breadcrumb-item"><a href="/dashboard" class="text-decoration-none text-muted">Dashboard</a></li>
+                <li class="breadcrumb-item active text-primary">Profile</li>
+            </ol>
+        </nav>
+    </div>
+
+    @if (user == null)
+    {
+        <div class="loading-state p-5 text-center">
+            <div class="spinner-border text-primary mb-3" role="status"></div>
+            <p class="text-muted">Loading your profile details...</p>
+        </div>
+    }
+    else
+    {
+        <div class="row g-4">
+            <!-- User Details Card -->
+            <div class="col-lg-7">
+                <div class="premium-card h-100 shadow-sm border-0 overflow-hidden">
+                    <div class="premium-header text-white p-4">
+                        <div class="d-flex align-items-center">
+                            <div class="premium-header-badge me-4">
+                                <i class="fa-solid fa-user-gear fs-4"></i>
+                            </div>
+                            <div>
+                                <h5 class="fw-bold mb-0">Personal Information</h5>
+                                <p class="mb-0 opacity-75 small">Manage your account details</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body p-4">
+                        @if (showSuccessMessage)
+                        {
+                            <div class="alert alert-success d-flex align-items-center mb-4 border-0 shadow-sm" role="alert">
+                                <i class="fa-solid fa-circle-check me-3 fs-5"></i>
+                                <div>Profile details updated successfully!</div>
+                                <button type="button" class="btn-close ms-auto" @onclick="() => showSuccessMessage = false"></button>
+                            </div>
+                        }
+
+                        <div class="row g-4">
+                            <div class="col-12">
+                                <div class="form-group-custom">
+                                    <label class="form-label-custom">User Name</label>
+                                    <DxTextBox @bind-Text="@user.UserName" 
+                                               ReadOnly="true" />
+                                    <span class="tiny text-muted mt-2 d-block opacity-75">
+                                        <i class="fa-solid fa-lock me-1"></i>Username is managed by administration
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="col-12">
+                                <div class="form-group-custom">
+                                    <label class="form-label-custom">Email Address</label>
+                                    <DxTextBox @bind-Text="@user.Email" 
+                                               ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto" />
+                                </div>
+                            </div>
+
+                            <div class="col-12 mt-4">
+                                <h6 class="tiny fw-bold text-uppercase text-muted mb-3 border-bottom pb-2">Account Options</h6>
+                                <div class="d-flex flex-column gap-3">
+                                    <div class="settings-pill p-3 rounded-3 border bg-white shadow-sm d-flex align-items-center">
+                                        <DxCheckBox @bind-Checked="@user.IsActive" ReadOnly="true" />
+                                        <div class="ms-3">
+                                            <div class="fw-bold small">Account Active</div>
+                                            <div class="tiny text-muted">Current status of your system access</div>
+                                        </div>
+                                    </div>
+
+                                    <div class="settings-pill p-3 rounded-3 border bg-white shadow-sm d-flex align-items-center">
+                                        <DxCheckBox @bind-Checked="@user.ChangePasswordOnLogin" />
+                                        <div class="ms-3">
+                                            <div class="fw-bold small">Request Password Reset</div>
+                                            <div class="tiny text-muted">Force change on next successful login</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-12 mt-5 border-top pt-4">
+                                <DxButton Text="Save Profile Changes" 
+                                          Click="SaveProfile"
+                                          RenderStyle="ButtonRenderStyle.Primary" 
+                                          CssClass="px-5 py-3 shadow-sm w-100"
+                                          IconCssClass="fa-solid fa-floppy-disk" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Role Information Card -->
+            <div class="col-lg-5">
+                <div class="premium-card h-100 shadow-sm border-0 overflow-hidden">
+                    <div class="premium-header-alt text-white p-4">
+                        <div class="d-flex align-items-center">
+                            <div class="premium-header-badge me-4">
+                                <i class="fa-solid fa-shield-halved fs-4"></i>
+                            </div>
+                            <div>
+                                <h5 class="fw-bold mb-0">Permissions Overview</h5>
+                                <p class="mb-0 opacity-75 small">Role-based access controls</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        @if (user.Role != null)
+                        {
+                            <div class="p-4 bg-light border-bottom">
+                                <div class="d-flex align-items-center">
+                                    <div class="bg-white rounded-circle p-3 shadow-sm me-3">
+                                        <i class="fa-solid fa-id-badge fa-2x text-primary"></i>
+                                    </div>
+                                    <div>
+                                        <div class="tiny fw-bold text-uppercase text-muted">Current Role</div>
+                                        <div class="h5 fw-bold mb-0">@user.Role.Name</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="p-4">
+                                <div class="permission-item d-flex justify-content-between align-items-center mb-4">
+                                    <div>
+                                        <div class="fw-bold small">Administrative Authority</div>
+                                        <div class="tiny text-muted">Full system configuration access</div>
+                                    </div>
+                                    <span class='trend-badge @(user.Role.IsAdministrative ? "positive" : "neutral")'>
+                                        @(user.Role.IsAdministrative ? "AUTHORIZED" : "LIMITED")
+                                    </span>
+                                </div>
+
+                                <div class="permission-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <div class="fw-bold small">Data Modification</div>
+                                        <div class="tiny text-muted">Permission to update core models</div>
+                                    </div>
+                                    <span class='trend-badge @(user.Role.CanEditModel ? "positive" : "neutral")'>
+                                        @(user.Role.CanEditModel ? "AUTHORIZED" : "LIMITED")
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="bg-light p-4 mt-auto">
+                                <div class="d-flex align-items-center text-muted">
+                                    <i class="fa-solid fa-circle-info me-2"></i>
+                                    <span class="tiny">Role permissions are managed by system administrators.</span>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-center p-5">
+                                <i class="fa-solid fa-user-slash fa-3x text-light mb-3"></i>
+                                <p class="text-muted mb-0">No specific role assigned.</p>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .premium-header { background: linear-gradient(135deg, #4e73df 0%, #224abe 100%); }
+    .premium-header-alt { background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%); }
+
+    .form-group-custom { margin-bottom: 0.5rem; }
+    .form-label-custom {
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: #475569;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+
+    .settings-pill:hover { border-color: #4e73df !important; }
+
+    .breadcrumb-item + .breadcrumb-item::before {
+        content: "\f105";
+        font-family: "Font Awesome 6 Free";
+        font-weight: 900;
+        font-size: 0.7rem;
+        padding: 0 10px;
+        color: #cbd5e1;
+    }
+</style>
+
+@code {
+    private User? user;
+    private bool showSuccessMessage = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!LoginManager.IsLoggedIn || LoginManager.CurrentUser == null)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        user = await DbContext.Users
+            .Include(u => u.Role)
+            .FirstOrDefaultAsync(u => u.Id == LoginManager.CurrentUser.Id);
+            
+        if (user == null)
+        {
+            Navigation.NavigateTo("/");
+        }
+    }
+
+    private async Task SaveProfile()
+    {
+        if (user != null)
+        {
+            try
+            {
+                DbContext.Users.Update(user);
+                await DbContext.SaveChangesAsync();
+                showSuccessMessage = true;
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error saving profile: {ex.Message}");
+            }
+        }
+    }
+}

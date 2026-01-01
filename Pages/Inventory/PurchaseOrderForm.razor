@@ -1,0 +1,553 @@
+@page "/purchase-order/new"
+@page "/purchase-order/{Id:int}"
+@using EyeHospitalPOS.Models
+@using EyeHospitalPOS.Interfaces
+@using EyeHospitalPOS.Data
+@using EyeHospitalPOS.Helper
+@using Microsoft.EntityFrameworkCore
+@inject IPurchaseOrderService PurchaseOrderService
+@inject IProductService ProductService
+@inject ApplicationDbContext DbContext
+@inject NavigationManager Navigation
+@inject LoginManager LoginManager
+@inject IJSRuntime JSRuntime
+
+<PageTitle>@(Id == 0 ? "New Purchase Order" : $"PO-{CurrentPO.PONumber}") - Eye Hospital POS</PageTitle>
+
+@if (LoginManager.CurrentUser == null)
+{
+    <div class="alert alert-warning m-4">Please login to access this page.</div>
+}
+else
+{
+    <div class="page-container" style="padding: 0 2rem 100px 2rem;">
+        
+        <!-- Sticky Toolbar -->
+        <div class="sticky-top d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-3">
+                <DxButton RenderStyle="ButtonRenderStyle.Secondary" 
+                          IconCssClass="fa-solid fa-arrow-left" 
+                          SizeMode="SizeMode.Small"
+                          CssClass="btn-toolbar"
+                          Click="@(() => Navigation.NavigateTo("/purchase-order"))" />
+                
+                <div>
+                    <h5 class="mb-0 fw-bold">@(Id == 0 ? "New Purchase Order" : CurrentPO.PONumber)</h5>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge @GetStatusBadgeClass(CurrentPO.Status)">@CurrentPO.Status</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="toolbar-actions">
+                @if (CurrentPO.Status == PurchaseOrderStatus.Draft)
+                {
+                    <DxButton Text="Cancel PO" 
+                              RenderStyle="ButtonRenderStyle.Secondary" 
+                              IconCssClass="fa-solid fa-xmark"
+                              SizeMode="SizeMode.Small"
+                              CssClass="btn-toolbar"
+                              Click="CancelPO" />
+
+                    <DxButton Text="Save Draft" 
+                              RenderStyle="ButtonRenderStyle.Secondary" 
+                              IconCssClass="fa-solid fa-floppy-disk"
+                              SizeMode="SizeMode.Small"
+                              CssClass="btn-toolbar"
+                              Click="SaveDraft" />
+
+                     <DxButton Text="Activate PO" 
+                              RenderStyle="ButtonRenderStyle.Success" 
+                              IconCssClass="fa-solid fa-check"
+                              SizeMode="SizeMode.Small"
+                              CssClass="btn-toolbar"
+                              Click="ActivatePO" />
+                }
+                else if (CurrentPO.Status == PurchaseOrderStatus.Active)
+                {
+                    <DxButton Text="Complete PO" 
+                              RenderStyle="ButtonRenderStyle.Primary" 
+                              IconCssClass="fa-solid fa-check-double"
+                              SizeMode="SizeMode.Small"
+                              CssClass="btn-toolbar"
+                              Click="CompletePO" />
+                    
+                     <DxButton Text="Generate IR" 
+                              RenderStyle="ButtonRenderStyle.Info" 
+                              IconCssClass="fa-solid fa-truck-ramp-box"
+                              SizeMode="SizeMode.Small"
+                              CssClass="btn-toolbar"
+                              Click="GenerateIR" />
+                }
+            </div>
+        </div>
+
+        <!-- Header Information Form -->
+        <div class="premium-card mt-3">
+            <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; padding: 0.75rem 1.25rem;">
+                <h6 class="text-white mb-0 fw-semibold">Purchase Order</h6>
+            </div>
+            <div class="card-body p-4" style="background-color: #f8f9fa;">
+                <DxFormLayout Data="@CurrentPO" ItemSpacing="10px" CaptionPosition="CaptionPosition.Horizontal">
+                    <DxFormLayoutGroup ColSpanLg="12">
+                        <!-- Row 1: PO No and Transaction Date -->
+                        <DxFormLayoutItem Caption="PO No:" ColSpanLg="6" ColSpanMd="12">
+                            <DxTextBox Text="@CurrentPO.PONumber" ReadOnly="true" EnableValidation="false" />
+                        </DxFormLayoutItem>
+                        <DxFormLayoutItem Caption="Transaction Date:" ColSpanLg="6" ColSpanMd="12">
+                            <DxDateEdit @bind-Date="@CurrentPO.TransactionDate" 
+                                        EnableValidation="false"
+                                        Enabled="@(CurrentPO.Status == PurchaseOrderStatus.Draft)" />
+                        </DxFormLayoutItem>
+                        
+                        <!-- Row 2: Supplier and Remarks -->
+                        <DxFormLayoutItem Caption="Supplier:" ColSpanLg="6" ColSpanMd="12">
+                            <DxComboBox Data="@Suppliers" 
+                                        @bind-Value="@CurrentPO.SupplierId" 
+                                        ValueFieldName="Id" 
+                                        TextFieldName="Name" 
+                                        FilteringMode="DataGridFilteringMode.Contains"
+                                        EnableValidation="false"
+                                        Enabled="@(CurrentPO.Status == PurchaseOrderStatus.Draft)" />
+                        </DxFormLayoutItem>
+                        <DxFormLayoutItem Caption="Remarks:" ColSpanLg="6" ColSpanMd="12">
+                            <DxTextBox @bind-Text="@CurrentPO.Remarks" 
+                                       EnableValidation="false"
+                                       Enabled="@(CurrentPO.Status == PurchaseOrderStatus.Draft)" />
+                        </DxFormLayoutItem>
+                        
+                        <!-- Row 3: Created On and Approved By -->
+                        <DxFormLayoutItem Caption="Created On:" ColSpanLg="6" ColSpanMd="12">
+                            <DxDateEdit @bind-Date="@CurrentPO.OrderDate" ReadOnly="true" EnableValidation="false" />
+                        </DxFormLayoutItem>
+                        <DxFormLayoutItem Caption="Approved By:" ColSpanLg="6" ColSpanMd="12">
+                            <DxTextBox Text="@CurrentPO.ApprovedBy" ReadOnly="true" EnableValidation="false" />
+                        </DxFormLayoutItem>
+                        
+                        <!-- Row 4: Total Amount and empty space -->
+                        <DxFormLayoutItem Caption="Total Amount:" ColSpanLg="6" ColSpanMd="12">
+                            <DxSpinEdit Value="@CurrentPO.TotalAmount" 
+                                        ReadOnly="true" 
+                                        DisplayFormat="@($"{currencySymbol} #,0.00")" 
+                                        ShowSpinButtons="false"
+                                        EnableValidation="false" />
+                        </DxFormLayoutItem>
+                        <DxFormLayoutItem Caption="" ColSpanLg="6" ColSpanMd="12">
+                            <!-- Empty space -->
+                        </DxFormLayoutItem>
+                        
+                        <!-- Row 5: Description (full width) -->
+                        <DxFormLayoutItem Caption="Description:" ColSpanLg="12">
+                            <DxMemo @bind-Text="@CurrentPO.Description" 
+                                    Rows="8"
+                                    EnableValidation="false"
+                                    Enabled="@(CurrentPO.Status == PurchaseOrderStatus.Draft)" />
+                        </DxFormLayoutItem>
+                    </DxFormLayoutGroup>
+                </DxFormLayout>
+            </div>
+        </div>
+
+        <!-- Items Grid -->
+        <div class="premium-card mt-3">
+            <div class="card-header bg-light py-2 d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fa-solid fa-box text-warning"></i>
+                    <span class="fw-bold text-dark">Required Items</span>
+                </div>
+            </div>
+            
+            <div class="card-body p-0">
+                <DxGrid Data="@CurrentPO.PurchaseItems"
+                        EditMode="GridEditMode.EditRow"
+                        EditorRenderMode="GridEditorRenderMode.Integrated"
+                        EditModelSaving="OnItemSaving"
+                        DataItemDeleting="OnItemDeleting"
+                        CssClass="enterprise-grid">
+                    <Columns>
+                        <DxGridDataColumn Caption="Product" FieldName="ProductId" MinWidth="250">
+                            <CellDisplayTemplate>
+                                @{
+                                    var item = (PurchaseItem)context.DataItem;
+                                    var prod = Products.FirstOrDefault(p => p.Id == item.ProductId);
+                                    <span>@(prod?.Name ?? "Select Product")</span>
+                                }
+                            </CellDisplayTemplate>
+                            <CellEditTemplate>
+                                <DxComboBox Data="@Products"
+                                            Value="@(((PurchaseItem)context.EditModel).ProductId)"
+                                            ValueChanged="@((int newValue) => { ((PurchaseItem)context.EditModel).ProductId = newValue; })"
+                                            ValueFieldName="Id"
+                                            TextFieldName="Name"
+                                            FilteringMode="DataGridFilteringMode.Contains"
+                                            EnableValidation="false" />
+                            </CellEditTemplate>
+                        </DxGridDataColumn>
+                        
+                        <DxGridDataColumn FieldName="Quantity" Caption="Quantity" Width="120px">
+                             <CellEditTemplate>
+                                <DxSpinEdit Value="@(((PurchaseItem)context.EditModel).Quantity)"
+                                            ValueChanged="@((int newValue) => { 
+                                                ((PurchaseItem)context.EditModel).Quantity = newValue; 
+                                                CalculateItemTotal(context.EditModel);
+                                            })"
+                                            MinValue="1" 
+                                            EnableValidation="false" />
+                            </CellEditTemplate>
+                        </DxGridDataColumn>
+                        
+                        <DxGridDataColumn FieldName="UnitPrice" Caption="Price" Width="120px">
+                            <CellEditTemplate>
+                                <DxSpinEdit Value="@(((PurchaseItem)context.EditModel).UnitPrice)"
+                                            ValueChanged="@((decimal newValue) => { 
+                                                ((PurchaseItem)context.EditModel).UnitPrice = newValue; 
+                                                CalculateItemTotal(context.EditModel);
+                                            })"
+                                            MinValue="0" 
+                                            DisplayFormat="@($"{currencySymbol} #,0.00")"
+                                            EnableValidation="false" />
+                            </CellEditTemplate>
+                        </DxGridDataColumn>
+                        
+                        <DxGridDataColumn FieldName="Amount" Caption="Amount" Width="120px" ReadOnly="true">
+                             <CellDisplayTemplate>
+                                 @{
+                                     var item = (PurchaseItem)context.DataItem;
+                                     var amt = item.Quantity * item.UnitPrice;
+                                 }
+                                 <span class="fw-bold">@($"{currencySymbol} {amt.ToString("N2")}")</span>
+                             </CellDisplayTemplate>
+                        </DxGridDataColumn>
+
+                        <DxGridDataColumn FieldName="ReceivedQuantity" Caption="Received Quantity" Width="150px" ReadOnly="true" />
+
+                        @if (CurrentPO.Status == PurchaseOrderStatus.Draft)
+                        {
+                            <DxGridDataColumn Width="130px" Caption="Actions">
+                                <HeaderCaptionTemplate>
+                                    <div class="d-flex justify-content-center align-items-center w-100" 
+                                         style="cursor: pointer;" 
+                                         @onclick="@(() => ShowProductModal = true)"
+                                         title="Add New Item">
+                                        <i class="fa-solid fa-circle-plus text-dark" style="font-size: 1.5rem;"></i>
+                                    </div>
+                                </HeaderCaptionTemplate>
+                                <CellDisplayTemplate>
+                                    <div class="d-flex gap-2 justify-content-center">
+                                        <DxButton HtmlElementId="@($"edit-btn-{((PurchaseItem)context.DataItem).ProductId}")"
+                                                  Text="+" 
+                                                  RenderStyle="ButtonRenderStyle.Primary" 
+                                                  SizeMode="SizeMode.Small"
+                                                  Click="@(() => OpenModifyModalForItem((PurchaseItem)context.DataItem))" />
+                                        <DxButton HtmlElementId="@($"del-btn-{((PurchaseItem)context.DataItem).ProductId}")"
+                                                  RenderStyle="ButtonRenderStyle.Danger" 
+                                                  IconCssClass="fa-solid fa-trash"
+                                                  SizeMode="SizeMode.Small"
+                                                  Click="@(() => {
+                                                      var item = (PurchaseItem)context.DataItem;
+                                                      CurrentPO.PurchaseItems.Remove(item);
+                                                      RecalculateTotal();
+                                                      StateHasChanged();
+                                                  })" />
+                                    </div>
+                                </CellDisplayTemplate>
+                            </DxGridDataColumn>
+                        }
+                    </Columns>
+                </DxGrid>
+            </div>
+        </div>
+
+        <!-- Footer Summary -->
+        <div class="premium-card footer-summary mt-3 p-4 d-flex justify-content-end align-items-center gap-5">
+            <div>
+                <span class="summary-label d-block mb-1">Total Items</span>
+                <span class="summary-value fs-4">@CurrentPO.PurchaseItems.Sum(i => i.Quantity)</span>
+            </div>
+            <div>
+                <span class="summary-label d-block mb-1">Total Amount</span>
+                <span class="summary-value highlight fs-3">@($"{currencySymbol} {CurrentPO.TotalAmount.ToString("N2")}")</span>
+            </div>
+        </div>
+
+        <!-- Product Selection Modal -->
+        <DxPopup @bind-Visible="@ShowProductModal"
+                 HeaderText="Select Product"
+                 Width="800px"
+                 Height="600px"
+                 ShowCloseButton="true">
+            <BodyContentTemplate>
+                <div class="p-3">
+                    <DxGrid Data="@Products"
+                            ShowFilterRow="true"
+                            ShowSearchBox="true"
+                            PageSize="15"
+                            CssClass="enterprise-grid">
+                        <Columns>
+                            <DxGridDataColumn FieldName="Name" Caption="Product Name" MinWidth="200" />
+                            <DxGridDataColumn FieldName="Category.Name" Caption="Category" Width="150" />
+                            <DxGridDataColumn FieldName="Type.Name" Caption="Type" Width="150" />
+                            <DxGridDataColumn FieldName="CostPrice" Caption="Cost Price" Width="120">
+                                    <CellDisplayTemplate Context="costContext">
+                                    @($"{currencySymbol} {((Product)costContext.DataItem).CostPrice.ToString("N2")}")
+                                </CellDisplayTemplate>
+                            </DxGridDataColumn>
+                            <DxGridDataColumn Caption="Action" Width="100" TextAlignment="GridTextAlignment.Center">
+                                <CellDisplayTemplate Context="productContext">
+                                    @{
+                                        var product = (Product)productContext.DataItem;
+                                    }
+                                    <DxButton Text="Select" 
+                                              RenderStyle="ButtonRenderStyle.Primary" 
+                                              SizeMode="SizeMode.Small"
+                                              Click="@(() => SelectProduct(product))" />
+                                </CellDisplayTemplate>
+                            </DxGridDataColumn>
+                        </Columns>
+                    </DxGrid>
+                </div>
+            </BodyContentTemplate>
+        </DxPopup>
+
+
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    
+    private PurchaseOrder CurrentPO = new() { PurchaseItems = new List<PurchaseItem>() };
+    private List<Supplier> Suppliers = new();
+    private List<Product> Products = new();
+    private bool ShowProductModal = false;
+    private string currencySymbol = "$";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (LoginManager.CurrentUser == null)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        Suppliers = await DbContext.Suppliers.AsNoTracking().ToListAsync();
+        Products = await ProductService.GetAllProductsAsync();
+        await LoadOrganizationSettings();
+
+        if (Id != 0)
+        {
+            var existing = await PurchaseOrderService.GetPurchaseOrderByIdAsync(Id);
+            if (existing != null)
+            {
+                CurrentPO = existing;
+                if (CurrentPO.PurchaseItems == null) 
+                    CurrentPO.PurchaseItems = new List<PurchaseItem>();
+            }
+        }
+        else
+        {
+            CurrentPO.PONumber = PurchaseOrderService.GeneratePONumber();
+            CurrentPO.OrderDate = DateTime.Now;
+            CurrentPO.TransactionDate = DateTime.Now;
+        }
+    }
+
+    private async Task LoadOrganizationSettings()
+    {
+        var org = await DbContext.Organizations.FirstOrDefaultAsync();
+        currencySymbol = CurrencyHelper.GetCurrencySymbol(org);
+    }
+
+    private void CalculateItemTotal(object editModel)
+    {
+        try {
+            var qtyProp = editModel.GetType().GetProperty("Quantity");
+            var priceProp = editModel.GetType().GetProperty("UnitPrice");
+            
+            int qty = (int)qtyProp.GetValue(editModel);
+            decimal price = (decimal)priceProp.GetValue(editModel);
+            
+            // Amount is usually calculated property or just display.
+            // But we can set it if we want it in DB
+            // editModel.GetType().GetProperty("Amount")?.SetValue(editModel, qty * price);
+        } catch {}
+    }
+
+    private void RecalculateTotal()
+    {
+        CurrentPO.TotalAmount = CurrentPO.PurchaseItems.Sum(i => i.Quantity * i.UnitPrice);
+    }
+
+    private async Task OnItemSaving(GridEditModelSavingEventArgs e)
+    {
+        e.Cancel = true;
+        
+        var item = (PurchaseItem)e.EditModel;
+        var existingItem = e.DataItem as PurchaseItem;
+
+        if (item.ProductId == 0 || item.Quantity <= 0) return;
+
+        // Note: Amount property isn't in PurchaseItem class in my memory of previous step (Wait, I added it in previous step? Yes I did.).
+        // Let's set it.
+        item.Amount = item.Quantity * item.UnitPrice;
+
+        if (e.IsNew)
+        {
+            item.PurchaseOrderId = CurrentPO.Id;
+            CurrentPO.PurchaseItems.Add(item);
+        }
+        else
+        {
+             if (existingItem != null)
+             {
+                 existingItem.ProductId = item.ProductId;
+                 existingItem.Quantity = item.Quantity;
+                 existingItem.UnitPrice = item.UnitPrice;
+                 existingItem.Amount = item.Amount;
+             }
+        }
+
+        RecalculateTotal();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnItemDeleting(GridDataItemDeletingEventArgs e)
+    {
+        var item = (PurchaseItem)e.DataItem;
+        CurrentPO.PurchaseItems.Remove(item);
+        RecalculateTotal();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SaveDraft()
+    {
+        if (CurrentPO.SupplierId == 0)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Validation Error: Supplier is required.");
+            return;
+        }
+
+        if (CurrentPO.Id == 0)
+            CurrentPO = await PurchaseOrderService.CreatePurchaseOrderAsync(CurrentPO);
+        else
+            CurrentPO = await PurchaseOrderService.UpdatePurchaseOrderAsync(CurrentPO);
+        
+        Navigation.NavigateTo($"/purchase-order/{CurrentPO.Id}");
+    }
+
+    private async Task ActivatePO()
+    {
+        if (CurrentPO.Id == 0) await SaveDraft();
+
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", "Activate this Purchase Order?")) return;
+
+        try
+        {
+            CurrentPO = await PurchaseOrderService.ActivatePurchaseOrderAsync(CurrentPO.Id, LoginManager.CurrentUser.Id);
+            await JSRuntime.InvokeVoidAsync("alert", "PO Activated!");
+        }
+        catch (Exception ex)
+        {
+             await JSRuntime.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+    }
+
+    private async Task CompletePO()
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", "Mark this PO as Completed?")) return;
+
+        try
+        {
+            CurrentPO = await PurchaseOrderService.CompletePurchaseOrderAsync(CurrentPO.Id, LoginManager.CurrentUser.Id);
+            await JSRuntime.InvokeVoidAsync("alert", "PO Completed!");
+        }
+        catch (Exception ex)
+        {
+             await JSRuntime.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+    }
+
+    private async Task CancelPO()
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", "Cancel this PO? This cannot be undone.")) return;
+
+        try
+        {
+            await PurchaseOrderService.CancelPurchaseOrderAsync(CurrentPO.Id, LoginManager.CurrentUser.Id);
+            CurrentPO.Status = PurchaseOrderStatus.Cancelled;
+            CurrentPO.IsCancelled = true;
+            await JSRuntime.InvokeVoidAsync("alert", "PO Cancelled.");
+        }
+        catch (Exception ex)
+        {
+             await JSRuntime.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+    }
+
+    private void GenerateIR()
+    {
+        // Navigate to IR creation with PO Id
+        Navigation.NavigateTo($"/inventory-receiving/new?poId={CurrentPO.Id}");
+    }
+
+    private void SelectProduct(Product product)
+    {
+        if (currentItemToModify != null)
+        {
+            // Modifying existing item
+            currentItemToModify.ProductId = product.Id;
+            currentItemToModify.UnitPrice = product.CostPrice;
+            currentItemToModify.Amount = currentItemToModify.Quantity * product.CostPrice;
+            
+            currentItemToModify = null;
+        }
+        else
+        {
+            // Check if product already exists in the list
+            var existingItem = CurrentPO.PurchaseItems.FirstOrDefault(i => i.ProductId == product.Id);
+            if (existingItem != null)
+            {
+                // If exists, just increase quantity
+                existingItem.Quantity++;
+                existingItem.Amount = existingItem.Quantity * existingItem.UnitPrice;
+            }
+            else
+            {
+                // Add new item
+                var newItem = new PurchaseItem
+                {
+                    PurchaseOrderId = CurrentPO.Id,
+                    ProductId = product.Id,
+                    Quantity = 1,
+                    UnitPrice = product.CostPrice,
+                    Amount = product.CostPrice,
+                    ReceivedQuantity = 0
+                };
+                CurrentPO.PurchaseItems.Add(newItem);
+            }
+        }
+        
+        RecalculateTotal();
+        ShowProductModal = false;
+        StateHasChanged();
+    }
+
+    private PurchaseItem currentItemToModify = null;
+
+    private void OpenModifyModalForItem(PurchaseItem item)
+    {
+        currentItemToModify = item;
+        ShowProductModal = true;
+    }
+
+    private string GetStatusBadgeClass(PurchaseOrderStatus status)
+    {
+        return status switch
+        {
+            PurchaseOrderStatus.Active => "bg-success text-white",
+            PurchaseOrderStatus.Completed => "bg-primary text-white",
+            PurchaseOrderStatus.Cancelled => "bg-danger text-white",
+            _ => "bg-secondary text-white"
+        };
+    }
+}

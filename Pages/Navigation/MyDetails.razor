@@ -1,0 +1,78 @@
+@page "/my-details"
+@using EyeHospitalPOS.Helper
+@using EyeHospitalPOS.Models
+@inject LoginManager LoginManager
+@inject NavigationManager Navigation
+
+<PageTitle>My Details - Eye Hospital POS</PageTitle>
+
+@if (LoginManager.CurrentUser == null)
+{
+    <div class="alert alert-warning m-4">Please login to access this page.</div>
+}
+else
+{
+    <div class="page-container p-4">
+        <!-- Unified Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+             <div>
+                <h3 class="mb-1 fw-bold">My Profile</h3>
+                <p class="text-muted tiny mb-0">View and manage your account information</p>
+             </div>
+        </div>
+
+        <div class="row g-4 justify-content-center">
+            <div class="col-md-8 col-lg-6">
+                <div class="premium-card">
+                    <div class="card-header bg-white border-0 p-4 text-center">
+                        <div class="bg-light rounded-circle p-3 d-inline-block mb-3" style="width: 80px; height: 80px;">
+                            <i class="fa-solid fa-user-tie fa-3x text-primary"></i>
+                        </div>
+                        <h4 class="fw-bold mb-0">@LoginManager.CurrentUser.UserName</h4>
+                        <span class="badge bg-light text-primary border fw-bold tiny px-3 py-2 mt-2">@LoginManager.GetRoleName()</span>
+                    </div>
+                    <div class="card-body p-4 pt-0">
+                        <div class="info-list">
+                            <div class="info-item mb-4 pb-2 border-bottom">
+                                <label class="text-muted tiny fw-bold text-uppercase d-block mb-1">Email Address</label>
+                                <span class="fw-bold"><i class="fa-solid fa-envelope me-2 text-muted"></i>@LoginManager.CurrentUser.Email</span>
+                            </div>
+                            <div class="row mb-4">
+                                <div class="col-6 border-end">
+                                    <label class="text-muted tiny fw-bold text-uppercase d-block mb-1">Status</label>
+                                    <span class='trend-badge @(LoginManager.CurrentUser.IsActive ? "positive" : "negative")' style="width: fit-content;">
+                                        @(LoginManager.CurrentUser.IsActive ? "Active" : "Inactive")
+                                    </span>
+                                </div>
+                                <div class="col-6 ps-4">
+                                    <label class="text-muted tiny fw-bold text-uppercase d-block mb-1">Member Since</label>
+                                    <span class="fw-bold"><i class="fa-solid fa-calendar me-2 text-muted"></i>@LoginManager.CurrentUser.CreatedDate.ToString("MMM yyyy")</span>
+                                </div>
+                            </div>
+                            <div class="bg-light rounded p-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <label class="text-muted tiny fw-bold text-uppercase d-block">Last Login</label>
+                                        <span class="small fw-bold">@(LoginManager.CurrentUser.LastLoginDate?.ToString("ddd, dd MMM yyyy HH:mm") ?? "N/A")</span>
+                                    </div>
+                                    <div class="text-primary"><i class="fa-solid fa-clock-rotate-left"></i></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    protected override void OnInitialized()
+    {
+        if (LoginManager.CurrentUser == null)
+        {
+            Navigation.NavigateTo("/login");
+        }
+    }
+}
+

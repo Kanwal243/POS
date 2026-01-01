@@ -1,0 +1,165 @@
+@page "/inventory-receiving"
+@using EyeHospitalPOS.Models
+@using EyeHospitalPOS.Helper
+@using EyeHospitalPOS.Interfaces
+@inject IInventoryService InventoryService
+@inject LoginManager LoginManager
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Inventory Receiving - Eye Hospital POS</PageTitle>
+
+@if (LoginManager.CurrentUser == null)
+{
+    <div class="alert alert-warning m-4">Please login to access this page.</div>
+}
+else
+{
+    <div class="page-container p-4">
+        <!-- Unified Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+             <div>
+                <h3 class="mb-1 fw-bold">Inventory Receiving</h3>
+                <p class="text-muted tiny mb-0">Record and manage stock arrivals from suppliers</p>
+             </div>
+             <DxButton Text="New Receiving"
+                       RenderStyle="ButtonRenderStyle.Primary"
+                       IconCssClass="fa-solid fa-plus"
+                       CssClass="premium-btn"
+                       Click="@(() => Navigation.NavigateTo("/inventory-receiving/new"))" />
+        </div>
+
+        <div class="premium-card overflow-hidden">
+            <div class="card-body p-0">
+                <DxGrid Data="@inventoryList"
+                        ShowFilterRow="false"
+                        ShowSearchBox="true"
+                        PageSize="20"
+                        CssClass="enterprise-grid">
+                    <Columns>
+                        <DxGridDataColumn FieldName="IRNumber" Caption="IRNo" Width="150px">
+                             <CellDisplayTemplate>
+                                <span class="fw-bold text-primary">@context.Value</span>
+                            </CellDisplayTemplate>
+                        </DxGridDataColumn>
+                        <DxGridDataColumn FieldName="Supplier.Name" Caption="Supplier" MinWidth="200">
+                             <CellDisplayTemplate>
+                                <div class="d-flex align-items-center">
+                                    <div class="bg-light rounded p-2 me-2" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
+                                        <i class="fa-solid fa-truck text-muted tiny"></i>
+                                    </div>
+                                    <span>@context.Value</span>
+                                </div>
+                            </CellDisplayTemplate>
+                        </DxGridDataColumn>
+                        <DxGridDataColumn FieldName="ReceivedBy" Caption="Received By" Width="150px" />
+                        <DxGridDataColumn FieldName="Description" Caption="Description" MinWidth="200" />
+                        <DxGridDataColumn FieldName="ReceivingDate" Caption="Transaction Date" Width="150px">
+                             <CellDisplayTemplate>
+                                <span class="text-muted small">@(((DateTime)context.Value).ToString("MMM dd, yyyy"))</span>
+                            </CellDisplayTemplate>
+                        </DxGridDataColumn>
+                        <DxGridDataColumn FieldName="Status" Caption="Status" Width="120px" HeaderCssClass="text-center" CssClass="text-center">
+                            <CellDisplayTemplate>
+                                @{
+                                    var status = (InventoryStatus)context.Value;
+                                    var badgeClass = status switch
+                                    {
+                                        InventoryStatus.Active => "positive", // Green
+                                        InventoryStatus.Cancelled => "negative", // Red
+                                        _ => "neutral" // Draft (Gray)
+                                    };
+                                }
+                                <span class='trend-badge @badgeClass' style="min-width: 80px; justify-content: center;">
+                                    @status
+                                </span>
+                            </CellDisplayTemplate>
+                        </DxGridDataColumn>
+                        <DxGridDataColumn Caption="Actions" Width="180px" TextAlignment="GridTextAlignment.Center">
+                            <CellDisplayTemplate>
+                                @{
+                                    var ir = (EyeHospitalPOS.Models.InventoryReceiving)context.DataItem;
+                                }
+                                <div class="d-flex justify-content-center gap-2">
+                                    <button class="btn btn-sm btn-light" title="View/Edit" @onclick="() => Edit(ir.Id)">
+                                        <i class="fa-solid @(ir.Status == InventoryStatus.Draft ? "fa-pen" : "fa-eye")"></i>
+                                    </button>
+                                    
+                                    @if (ir.Status == InventoryStatus.Draft)
+                                    {
+                                        <button class="btn btn-sm btn-light text-success" title="Activate" @onclick="() => Activate(ir.Id)">
+                                            <i class="fa-solid fa-check"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-light text-danger" title="Cancel" @onclick="() => Cancel(ir.Id)">
+                                            <i class="fa-solid fa-ban"></i>
+                                        </button>
+                                    }
+                                </div>
+                            </CellDisplayTemplate>
+                        </DxGridDataColumn>
+                    </Columns>
+                </DxGrid>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<EyeHospitalPOS.Models.InventoryReceiving> inventoryList = new List<EyeHospitalPOS.Models.InventoryReceiving>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (LoginManager.CurrentUser == null)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        await LoadInventoryReceivings();
+    }
+
+    private async Task LoadInventoryReceivings()
+    {
+        inventoryList = await InventoryService.GetAllInventoryReceivingsAsync();
+    }
+
+    private void Edit(int id)
+    {
+        Navigation.NavigateTo($"/inventory-receiving/{id}");
+    }
+
+    private async Task Activate(int id)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to activate this Inventory Receiving?"))
+            return;
+
+        try
+        {
+            await InventoryService.ActivateInventoryReceivingAsync(id, LoginManager.CurrentUser.Id);
+            await LoadInventoryReceivings(); // Refresh list
+            await JSRuntime.InvokeVoidAsync("alert", "IR Activated Successfully");
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+    }
+
+    private async Task Cancel(int id)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to cancel this IR?"))
+            return;
+
+        try
+        {
+            await InventoryService.CancelInventoryReceivingAsync(id, LoginManager.CurrentUser.Id);
+            await LoadInventoryReceivings();
+            await JSRuntime.InvokeVoidAsync("alert", "IR Cancelled");
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+    }
+}
+

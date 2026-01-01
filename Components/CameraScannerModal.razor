@@ -1,0 +1,338 @@
+@using System.ComponentModel.DataAnnotations
+@using EyeHospitalPOS.Models
+@using EyeHospitalPOS.Services
+@using EyeHospitalPOS.Interfaces
+@inject IJSRuntime JS
+@inject HttpClient Http
+@using System.Net.Http.Json
+@using Microsoft.EntityFrameworkCore
+@implements IAsyncDisposable
+
+<div class="camera-scanner-container">
+    @if (ShowScanner)
+    {
+        <div class="modal-backdrop fade show" style="display: block; background-color: rgba(0,0,0,0.5);"></div>
+        <div class="modal fade show" style="display: block;" role="dialog">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content border-0">
+                    <div class="modal-header bg-primary text-white border-0">
+                        <h5 class="modal-title">
+                            <i class="fa-solid fa-camera me-2"></i>Live Camera Barcode Scanner
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" @onclick="StopCamera"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <div class="row g-3">
+                            <div class="col-md-8">
+                                <div class="camera-preview-container border rounded overflow-hidden" style="background: #000; min-height: 400px; display: flex; align-items: center; justify-content: center;">
+                                    <video @ref="videoRef" 
+                                           style="width: 100%; height: 100%; object-fit: cover;" 
+                                           autoplay 
+                                           playsinline 
+                                           muted></video>
+                                </div>
+                                <small class="text-muted d-block mt-2">
+                                    <i class="fa-solid fa-lightbulb me-1"></i>Position barcode in front of camera
+                                </small>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="scanner-status">
+                                    <h6 class="fw-bold mb-3">Scanner Status</h6>
+                                    
+                                    <div class="status-item mb-3">
+                                        <small class="text-muted d-block">Camera</small>
+                                        <span class="@(CameraActive ? "badge bg-success" : "badge bg-danger")">
+                                            @(CameraActive ? "Active" : "Inactive")
+                                        </span>
+                                    </div>
+
+                                    <div class="status-item mb-3">
+                                        <small class="text-muted d-block">Barcodes Scanned</small>
+                                        <strong class="display-6">@ScannedCount</strong>
+                                    </div>
+
+                                    @if (!string.IsNullOrEmpty(LastScannedBarcode))
+                                    {
+                                        <div class="status-item alert alert-info">
+                                            <small class="d-block">Last Scanned</small>
+                                            <code>@LastScannedBarcode</code>
+                                        </div>
+                                    }
+
+                                    @if (LastScannedProduct != null)
+                                    {
+                                        <div class="status-item alert alert-success">
+                                            <small class="d-block">Product Found</small>
+                                            <strong>@LastScannedProduct.Name</strong>
+                                            <div class="text-muted tiny mt-2">
+                                                Price: @($"{currencySymbol} {LastScannedProduct.SalePrice.ToString("N2")}")
+                                                <br />Stock: @LastScannedProduct.StockQuantity
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 pt-3 border-top">
+                            <h6 class="fw-bold mb-3">Scanned Products (@ScannedProducts.Count)</h6>
+                            @if (ScannedProducts.Any())
+                            {
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Barcode</th>
+                                                <th>Product</th>
+                                                <th>Price</th>
+                                                <th>Stock</th>
+                                                <th>Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var product in ScannedProducts)
+                                            {
+                                                <tr>
+                                                    <td><code>@product.Barcode</code></td>
+                                                    <td>@product.Name</td>
+                                                    <td>@($"{currencySymbol} {product.SalePrice.ToString("N2")}")</td>
+                                                    <td>@product.StockQuantity</td>
+                                                    <td>
+                                                        <button class="btn btn-sm btn-outline-danger" 
+                                                                @onclick="() => ScannedProducts.Remove(product)">
+                                                            Remove
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                            else
+                            {
+                                <p class="text-muted text-center py-4">No products scanned yet</p>
+                            }
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0">
+                        <button type="button" class="btn btn-secondary" @onclick="StopCamera">Close</button>
+                        @if (ScannedProducts.Any())
+                        {
+                            <button type="button" class="btn btn-primary" @onclick="ExportScannedProducts">
+                                <i class="fa-solid fa-download me-2"></i>Export Results
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback<List<Product>> OnProductsScanned { get; set; }
+
+    [Parameter]
+    public bool ShowScanner { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> OnScannerClosed { get; set; }
+
+    private ElementReference videoRef;
+    private IJSObjectReference? _jsModule;
+    private DotNetObjectReference<CameraScannerModal>? _dotNetRef;
+    [Inject] private EyeHospitalPOS.Data.ApplicationDbContext DbContext { get; set; }
+    private string currencySymbol = "$";
+    private int ScannedCount = 0;
+    private string LastScannedBarcode = string.Empty;
+    private Product? LastScannedProduct = null;
+    private List<Product> ScannedProducts = new List<Product>();
+    private bool CameraActive = false;
+    private string? _scanCleanupFunction;
+    private DateTime _lastScanTime = DateTime.MinValue;
+    private const int MIN_SCAN_INTERVAL_MS = 1000; // Minimum 1 second between successful scans
+
+    protected override async Task OnInitializedAsync()
+    {
+        var org = await DbContext.Organizations.FirstOrDefaultAsync();
+        currencySymbol = EyeHospitalPOS.Helper.CurrencyHelper.GetCurrencySymbol(org);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+        }
+
+        if (ShowScanner && !CameraActive)
+        {
+            await StartCamera();
+        }
+    }
+
+    private async Task StartCamera()
+    {
+        try
+        {
+            // Request camera access and set video stream
+            var success = await JS.InvokeAsync<bool>("BarcodeScanner.requestCameraAccess", videoRef);
+            
+            if (success)
+            {
+                CameraActive = true;
+                StateHasChanged();
+
+                // Wait a bit for video to be ready
+                await Task.Delay(500);
+
+                // Start barcode detection loop
+                await InitializeBarcodeDetection();
+            }
+            else
+            {
+                Console.WriteLine("Failed to access camera");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Camera access error: {ex.Message}");
+        }
+    }
+
+    private async Task InitializeBarcodeDetection()
+    {
+        try
+        {
+            // Initialize the barcode detection loop
+            // The function returns a cleanup ID (for future use)
+            _scanCleanupFunction = await JS.InvokeAsync<string>("BarcodeScanner.initBarcodeDetection", 
+                videoRef, _dotNetRef, 500); // Scan every 500ms
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Barcode detection error: {ex.Message}");
+        }
+    }
+
+    [JSInvokable]
+    public async Task ProcessImageFrame(string imageData)
+    {
+        // Throttle scans to avoid too many API calls
+        var now = DateTime.Now;
+        if ((now - _lastScanTime).TotalMilliseconds < MIN_SCAN_INTERVAL_MS)
+        {
+            return;
+        }
+
+        try
+        {
+            // Note: Since this is Server-side Blazor, we should ideally use Services directly, 
+            // but for this specific implementation we are using HttpClient to call the API endpoint 
+            // as requested. We need to ensure base address is set if using relative URI.
+            
+            // To make this work robustly in Server-side without hardcoding localhost, 
+            // we often inject NavigationManager to get BaseUri.
+            
+            var response = await Http.PostAsJsonAsync("api/products/decode-barcode-image", 
+                new BarcodeImageRequest { ImageData = imageData });
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<BarcodeDecodeResponse>();
+                
+                if (result?.Success == true && !string.IsNullOrEmpty(result.Barcode))
+                {
+                    // Only process if we haven't scanned this barcode recently
+                    if (result.Barcode != LastScannedBarcode || 
+                        (now - _lastScanTime).TotalMilliseconds >= MIN_SCAN_INTERVAL_MS)
+                    {
+                        _lastScanTime = now;
+                        await OnBarcodeDetected(result.Barcode, result.Product);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error processing image frame: {ex.Message}");
+        }
+    }
+
+    private async Task OnBarcodeDetected(string barcode, Product? product)
+    {
+        if (string.IsNullOrEmpty(barcode)) return;
+
+        LastScannedBarcode = barcode;
+        ScannedCount++;
+
+        if (product != null)
+        {
+            LastScannedProduct = product;
+            
+            // Add to scanned products list if not already present
+            if (!ScannedProducts.Any(p => p.Barcode == barcode))
+            {
+                ScannedProducts.Add(product);
+            }
+        }
+        else
+        {
+            // Product not found, but barcode was decoded
+            LastScannedProduct = null;
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task StopCamera()
+    {
+        try
+        {
+            CameraActive = false;
+
+            // Stop the scanning loop (cleanup is handled by isScanning flag in JS)
+            if (!string.IsNullOrEmpty(_scanCleanupFunction))
+            {
+                try
+                {
+                    await JS.InvokeVoidAsync("BarcodeScanner.stopBarcodeDetection", _scanCleanupFunction);
+                }
+                catch { }
+            }
+
+            // Stop camera stream
+            await JS.InvokeVoidAsync("BarcodeScanner.stopCameraStream", videoRef);
+
+            await OnScannerClosed.InvokeAsync(false);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error stopping camera: {ex.Message}");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (CameraActive)
+        {
+            await StopCamera();
+        }
+
+        _dotNetRef?.Dispose();
+        
+        if (_jsModule != null)
+        {
+            await _jsModule.DisposeAsync();
+        }
+    }
+
+    private async Task ExportScannedProducts()
+    {
+        await OnProductsScanned.InvokeAsync(ScannedProducts);
+        await StopCamera();
+    }
+}

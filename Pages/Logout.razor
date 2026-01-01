@@ -1,0 +1,15 @@
+@page "/logout"
+@using EyeHospitalPOS.Helper
+@inject LoginManager LoginManager
+@inject NavigationManager Navigation
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+            // Clear user session from memory and session storage
+            await LoginManager.LogoutAsync();
+
+            // Redirect to login with Force Load to clear middleware state
+            Navigation.NavigateTo("/login", true);
+    }
+}

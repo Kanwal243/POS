@@ -1,0 +1,369 @@
+@page "/invoice/new"
+@using EyeHospitalPOS.Models
+@using EyeHospitalPOS.Data
+@using EyeHospitalPOS.Interfaces
+@using EyeHospitalPOS.Helper
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject IProductService ProductService
+@inject NavigationManager Navigation
+@inject LoginManager LoginManager
+@inject IJSRuntime JSRuntime
+
+<PageTitle>New Invoice - Eye Hospital POS</PageTitle>
+
+@if (LoginManager.CurrentUser == null)
+{
+    <div class="alert alert-warning m-4">Please login to access this page.</div>
+}
+else
+{
+    <div class="page-container" style="padding: 1.5rem; background-color: #f8f9fa; min-height: 100vh;">
+        <!-- Toolbar Header -->
+        <div class="premium-card mb-4 border-0 shadow-sm" style="background: white; border-radius: 12px;">
+            <div class="card-body p-3 d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-3">
+                    <DxButton RenderStyle="ButtonRenderStyle.Light" 
+                              IconCssClass="fa-solid fa-arrow-left text-muted" 
+                              SizeMode="SizeMode.Medium"
+                              Click="@(() => Navigation.NavigateTo("/invoices"))"
+                              CssClass="rounded-circle" />
+                    <div>
+                        <h4 class="mb-0 fw-bold text-dark">New Invoice</h4>
+                        <p class="text-muted tiny mb-0">Create and process patient billing</p>
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <DxButton RenderStyle="ButtonRenderStyle.Secondary" IconCssClass="fa-solid fa-file-circle-plus" Title="New" />
+                    <DxButton Text="Save" 
+                              RenderStyle="ButtonRenderStyle.Success" 
+                              IconCssClass="fa-solid fa-floppy-disk" 
+                              Click="SaveInvoice"
+                              CssClass="px-3 fw-bold" />
+                    <DxButton RenderStyle="ButtonRenderStyle.Danger" IconCssClass="fa-solid fa-trash-can" Title="Delete" Enabled="@(currentSale.Id > 0)" />
+                    <div class="vr mx-2"></div>
+                    <DxButton RenderStyle="ButtonRenderStyle.Primary" IconCssClass="fa-solid fa-print" Title="Print" Enabled="@(currentSale.Id > 0)" />
+                    <DxButton RenderStyle="ButtonRenderStyle.Info" IconCssClass="fa-solid fa-file-pdf" Title="Export" Enabled="@(currentSale.Id > 0)" />
+                    <div class="vr mx-2"></div>
+                    <DxButton RenderStyle="ButtonRenderStyle.Secondary" IconCssClass="fa-solid fa-chevron-left" />
+                    <DxButton RenderStyle="ButtonRenderStyle.Secondary" IconCssClass="fa-solid fa-chevron-right" />
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <!-- Header Information -->
+            <div class="col-12">
+                <div class="premium-card border-0 shadow-sm" style="background: white; border-radius: 12px; overflow: hidden;">
+                    <div class="card-header py-2 px-3 border-0" style="background: #eef2f7;">
+                        <span class="fw-bold tiny text-muted text-uppercase tracking-wider">General Information</span>
+                    </div>
+                    <div class="card-body p-4">
+                        <DxFormLayout ItemSpacing="20px">
+                            <DxFormLayoutGroup ColSpanLg="12" Decoration="FormLayoutGroupDecoration.None">
+                                <!-- Row 1 -->
+                                <DxFormLayoutItem Caption="Inv No:" ColSpanLg="6" ColSpanMd="12">
+                                    <DxTextBox Text="@currentSale.InvoiceNumber" ReadOnly="true" CssClass="bg-light fw-bold" />
+                                </DxFormLayoutItem>
+                                <DxFormLayoutItem Caption="Total Discount:" ColSpanLg="6" ColSpanMd="12">
+                                    <DxSpinEdit Value="@currentSale.DiscountAmount"
+                                                ValueExpression="@(() => currentSale.DiscountAmount)"
+                                                DisplayFormat="@($"{currencySymbol} #,0.00")" 
+                                                ValueChanged="@((decimal val) => OnTotalDiscountChanged(val))" />
+                                </DxFormLayoutItem>
+
+                                <!-- Row 2 -->
+                                <DxFormLayoutItem Caption="Customer:" ColSpanLg="6" ColSpanMd="12">
+                                    <DxComboBox Data="@customers" 
+                                                @bind-Value="@currentSale.CustomerId" 
+                                                ValueFieldName="Id" 
+                                                TextFieldName="DisplayName"
+                                                FilteringMode="DataGridFilteringMode.Contains"
+                                                NullText="Search for a customer..." />
+                                </DxFormLayoutItem>
+                                <DxFormLayoutItem Caption="Amount Paid:" ColSpanLg="6" ColSpanMd="12">
+                                    <DxSpinEdit @bind-Value="@currentSale.AmountPaid" 
+                                                DisplayFormat="@($"{currencySymbol} #,0.00")" />
+                                </DxFormLayoutItem>
+
+                                <!-- Row 3 -->
+                                <DxFormLayoutItem Caption="Purchased By:" ColSpanLg="6" ColSpanMd="12">
+                                    <DxTextBox @bind-Text="@currentSale.PurchasedBy" NullText="Enter purchaser name..." />
+                                </DxFormLayoutItem>
+                                <DxFormLayoutItem Caption="Description:" ColSpanLg="6" ColSpanMd="12">
+                                    <DxTextBox @bind-Text="@currentSale.Description" />
+                                </DxFormLayoutItem>
+
+                                <!-- Row 4 -->
+                                <DxFormLayoutItem Caption="Total Amount:" ColSpanLg="6" ColSpanMd="12">
+                                    <DxSpinEdit Value="@currentSale.SubTotal" ReadOnly="true" 
+                                                DisplayFormat="@($"{currencySymbol} #,0.00")" CssClass="bg-light fw-bold" />
+                                </DxFormLayoutItem>
+                                <DxFormLayoutItem Caption="Remarks:" ColSpanLg="6" ColSpanMd="12">
+                                    <DxTextBox @bind-Text="@currentSale.Remarks" />
+                                </DxFormLayoutItem>
+
+                                <!-- Row 5 -->
+                                <DxFormLayoutItem Caption="Total Payable:" ColSpanLg="6" ColSpanMd="12">
+                                    <DxSpinEdit Value="@currentSale.TotalAmount" ReadOnly="true" 
+                                                DisplayFormat="@($"{currencySymbol} #,0.00")" CssClass="bg-light text-primary fw-bold fs-5" />
+                                </DxFormLayoutItem>
+                                <DxFormLayoutItem Caption="Transaction Date:" ColSpanLg="6" ColSpanMd="12">
+                                    <DxDateEdit Date="@currentSale.SaleDate" 
+                                                DateExpression="@(() => currentSale.SaleDate)"
+                                                DateChanged="@(async (DateTime val) => { currentSale.SaleDate = val; currentSale.InvoiceNumber = await GenerateSequentialInvoiceNumber(); })"
+                                                ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Never" />
+                                </DxFormLayoutItem>
+                            </DxFormLayoutGroup>
+                        </DxFormLayout>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Items Table -->
+            <div class="col-12">
+                <div class="premium-card border-0 shadow-sm" style="background: white; border-radius: 12px; overflow: hidden;">
+                    <div class="card-header py-3 px-4 border-0 d-flex justify-content-between align-items-center" style="background: #eef2f7;">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fa-solid fa-list-check text-primary"></i>
+                            <span class="fw-bold text-dark text-uppercase tracking-wider">Issued Items</span>
+                        </div>
+                        <DxButton Text="Add New Item" 
+                                  RenderStyle="ButtonRenderStyle.Primary" 
+                                  SizeMode="SizeMode.Small" 
+                                  IconCssClass="fa-solid fa-plus-circle" 
+                                  Click="@(() => Grid.StartEditNewRowAsync())"
+                                  CssClass="fw-semibold px-3" />
+                    </div>
+                    <div class="card-body p-0">
+                        <DxGrid @ref="Grid"
+                                Data="@currentSale.SaleItems"
+                                EditMode="GridEditMode.EditRow"
+                                EditorRenderMode="GridEditorRenderMode.Integrated"
+                                EditModelSaving="OnItemSaving"
+                                DataItemDeleting="OnItemDeleting"
+                                CssClass="enterprise-grid border-0"
+                                PageSize="100">
+                            <Columns>
+                                <DxGridDataColumn FieldName="ProductId" Caption="Product" MinWidth="250">
+                                    <CellDisplayTemplate>
+                                        @{
+                                            var item = (SaleItem)context.DataItem;
+                                            var prod = products.FirstOrDefault(p => p.Id == item.ProductId);
+                                            <div class="d-flex flex-column">
+                                                <span class="fw-bold">@(prod?.Name ?? "Select Product")</span>
+                                                <span class="text-muted tiny">@(prod?.Barcode ?? "---")</span>
+                                            </div>
+                                        }
+                                    </CellDisplayTemplate>
+                                    <CellEditTemplate>
+                                        <DxComboBox Data="@products"
+                                                    Value="@(((SaleItem)context.EditModel).ProductId)"
+                                                    ValueChanged="@((int val) => OnProductChanged((SaleItem)context.EditModel, val))"
+                                                    ValueFieldName="Id"
+                                                    TextFieldName="Name"
+                                                    FilteringMode="DataGridFilteringMode.Contains"
+                                                    NullText="Choose a product..." />
+                                    </CellEditTemplate>
+                                </DxGridDataColumn>
+                                <DxGridDataColumn FieldName="Description" Caption="Description" MinWidth="150" />
+                                <DxGridDataColumn FieldName="Quantity" Caption="Qty" Width="100px" TextAlignment="GridTextAlignment.Center">
+                                     <CellEditTemplate>
+                                         <DxSpinEdit Value="@(((SaleItem)context.EditModel).Quantity)"
+                                                     ValueChanged="@((int val) => { ((SaleItem)context.EditModel).Quantity = val; RecalculateItem((SaleItem)context.EditModel); })" 
+                                                     MinValue="1" />
+                                     </CellEditTemplate>
+                                </DxGridDataColumn>
+                                <DxGridDataColumn FieldName="UnitPrice" Caption="Price" Width="150px" HeaderCssClass="text-end" CssClass="text-end">
+                                     <CellEditTemplate>
+                                         <DxSpinEdit Value="@(((SaleItem)context.EditModel).UnitPrice)"
+                                                     ValueChanged="@((decimal val) => { ((SaleItem)context.EditModel).UnitPrice = val; RecalculateItem((SaleItem)context.EditModel); })"
+                                                     DisplayFormat="@($"{currencySymbol} #,0.00")" 
+                                                     MinValue="0" />
+                                     </CellEditTemplate>
+                                     <CellDisplayTemplate>
+                                         <span class="text-muted">@($"{currencySymbol} {((decimal)context.Value).ToString("N2")}")</span>
+                                     </CellDisplayTemplate>
+                                </DxGridDataColumn>
+                                <DxGridDataColumn FieldName="Subtotal" Caption="Amount" Width="150px" HeaderCssClass="text-end" CssClass="text-end" ReadOnly="true">
+                                    <CellDisplayTemplate>
+                                        <span class="fw-semibold">@($"{currencySymbol} {((decimal)context.Value).ToString("N2")}")</span>
+                                    </CellDisplayTemplate>
+                                </DxGridDataColumn>
+                                <DxGridDataColumn FieldName="Discount" Caption="Discount" Width="120px" HeaderCssClass="text-end" CssClass="text-end">
+                                     <CellEditTemplate>
+                                         <DxSpinEdit Value="@(((SaleItem)context.EditModel).Discount)"
+                                                     ValueChanged="@((decimal val) => { ((SaleItem)context.EditModel).Discount = val; RecalculateItem((SaleItem)context.EditModel); })" 
+                                                     MinValue="0" />
+                                     </CellEditTemplate>
+                                     <CellDisplayTemplate>
+                                         <span class="text-danger">@($"{currencySymbol} {((decimal)context.Value).ToString("N2")}")</span>
+                                     </CellDisplayTemplate>
+                                </DxGridDataColumn>
+                                <DxGridDataColumn Caption="Payable" Width="150px" HeaderCssClass="text-end" CssClass="text-end">
+                                    <CellDisplayTemplate>
+                                        @{
+                                            var item = (SaleItem)context.DataItem;
+                                            var payable = item.Subtotal - item.Discount;
+                                        }
+                                        <span class="fw-bold text-primary">@($"{currencySymbol} {payable.ToString("N2")}")</span>
+                                    </CellDisplayTemplate>
+                                </DxGridDataColumn>
+                                <DxGridCommandColumn Width="120px" NewButtonVisible="false" />
+                            </Columns>
+                        </DxGrid>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private Sale currentSale = new Sale { SaleDate = DateTime.Now, SaleItems = new List<SaleItem>() };
+    private List<Customer> customers = new List<Customer>();
+    private List<Product> products = new List<Product>();
+    private IGrid Grid { get; set; }
+    private string currencySymbol = "$";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (LoginManager.CurrentUser == null) return;
+
+        customers = await DbContext.Customers.Where(c => c.IsActive).ToListAsync();
+        products = await ProductService.GetAllProductsAsync();
+        
+        var org = await DbContext.Organizations.FirstOrDefaultAsync();
+        currencySymbol = CurrencyHelper.GetCurrencySymbol(org);
+
+        // Generate a sequential Invoice Number for visual feedback
+        currentSale.InvoiceNumber = await GenerateSequentialInvoiceNumber();
+    }
+
+    private async Task<string> GenerateSequentialInvoiceNumber()
+    {
+        var prefix = $"INV-{currentSale.SaleDate:yyyyMMdd}-";
+        
+        var lastInvoice = await DbContext.Invoices
+            .AsNoTracking()
+            .Where(i => i.InvoiceNumber.StartsWith(prefix))
+            .OrderByDescending(i => i.InvoiceNumber)
+            .FirstOrDefaultAsync();
+
+        int nextSequence = 1;
+        if (lastInvoice != null)
+        {
+            var parts = lastInvoice.InvoiceNumber.Split('-');
+            if (parts.Length == 3 && int.TryParse(parts[2], out int lastSeq))
+            {
+                nextSequence = lastSeq + 1;
+            }
+        }
+
+        return $"{prefix}{nextSequence:D4}";
+    }
+
+    private void OnProductChanged(SaleItem item, int productId)
+    {
+        item.ProductId = productId;
+        var prod = products.FirstOrDefault(p => p.Id == productId);
+        if (prod != null)
+        {
+            item.UnitPrice = prod.SalePrice;
+            item.Description = prod.Name;
+            item.Quantity = 1;
+            RecalculateItem(item);
+        }
+    }
+
+    private void RecalculateItem(SaleItem item)
+    {
+        item.Subtotal = item.Quantity * item.UnitPrice;
+        UpdateTotals();
+    }
+
+    private void OnTotalDiscountChanged(decimal val)
+    {
+        currentSale.DiscountAmount = val;
+        UpdateTotals();
+    }
+
+    private void UpdateTotals()
+    {
+        currentSale.SubTotal = currentSale.SaleItems.Sum(i => i.Subtotal - i.Discount);
+        currentSale.TotalAmount = currentSale.SubTotal - currentSale.DiscountAmount;
+        StateHasChanged();
+    }
+
+    private async Task OnItemSaving(GridEditModelSavingEventArgs e)
+    {
+        var editModel = (SaleItem)e.EditModel;
+        if (e.IsNew)
+            currentSale.SaleItems.Add(editModel);
+        else
+        {
+            var dataItem = (SaleItem)e.DataItem;
+            dataItem.ProductId = editModel.ProductId;
+            dataItem.Quantity = editModel.Quantity;
+            dataItem.UnitPrice = editModel.UnitPrice;
+            dataItem.Discount = editModel.Discount;
+            dataItem.Subtotal = editModel.Subtotal;
+            dataItem.Description = editModel.Description;
+        }
+        UpdateTotals();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnItemDeleting(GridDataItemDeletingEventArgs e)
+    {
+        currentSale.SaleItems.Remove((SaleItem)e.DataItem);
+        UpdateTotals();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SaveInvoice()
+    {
+        if (currentSale.CustomerId == 0)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Validation Error: Please select a customer.");
+            return;
+        }
+
+        if (!currentSale.SaleItems.Any())
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Validation Error: Please add at least one item to the invoice.");
+            return;
+        }
+
+        try
+        {
+            currentSale.UserId = LoginManager.CurrentUser.Id;
+            
+            // Ensure the invoice number is still sequential and unique right before saving
+            currentSale.InvoiceNumber = await GenerateSequentialInvoiceNumber();
+            
+            // Recalculate one last time to be sure
+            UpdateTotals();
+
+            DbContext.Sales.Add(currentSale);
+
+            // Create corresponding Invoice record
+            var invoice = new Invoice
+            {
+                InvoiceNumber = currentSale.InvoiceNumber,
+                InvoiceDate = currentSale.SaleDate,
+                Sale = currentSale,
+                IsPrinted = false
+            };
+            DbContext.Invoices.Add(invoice);
+
+            await DbContext.SaveChangesAsync();
+            await JSRuntime.InvokeVoidAsync("alert", "Success: Invoice saved successfully!");
+            Navigation.NavigateTo("/invoices");
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"System Error: {ex.Message}");
+        }
+    }
+}

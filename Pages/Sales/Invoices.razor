@@ -1,0 +1,101 @@
+@page "/invoices"
+@using EyeHospitalPOS.Models
+@using EyeHospitalPOS.Helper
+@using EyeHospitalPOS.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject LoginManager LoginManager
+@inject NavigationManager Navigation
+
+<PageTitle>Invoices - Eye Hospital POS</PageTitle>
+
+@if (LoginManager.CurrentUser == null)
+{
+    <div class="alert alert-warning m-4">Please login to access this page.</div>
+}
+else
+{
+    <div class="page-container p-4">
+        <!-- Unified Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+             <div>
+                <h3 class="mb-1 fw-bold">Invoices</h3>
+                <p class="text-muted tiny mb-0">Track and manage patient billing history</p>
+             </div>
+             <DxButton Text="New Invoice" 
+                       RenderStyle="ButtonRenderStyle.Primary" 
+                       IconCssClass="fa-solid fa-plus"
+                       CssClass="premium-btn"
+                       Click="@(() => Navigation.NavigateTo("/invoice/new"))" />
+        </div>
+
+        <div class="premium-card overflow-hidden">
+            <div class="card-body p-0">
+                <DxGrid Data="@invoices"
+                        ShowFilterRow="false"
+                        ShowSearchBox="true"
+                        PageSize="20"
+                        CssClass="enterprise-grid">
+                    <Columns>
+                        <DxGridDataColumn FieldName="InvoiceNumber" Caption="Invoice #" Width="150px">
+                             <CellDisplayTemplate>
+                                <span class="fw-bold text-primary">@context.Value</span>
+                            </CellDisplayTemplate>
+                        </DxGridDataColumn>
+                        <DxGridDataColumn FieldName="Sale.Customer.DisplayName" Caption="Customer" MinWidth="200" />
+                        <DxGridDataColumn FieldName="InvoiceDate" Caption="Date" Width="150px">
+                            <CellDisplayTemplate>
+                                <span class="text-muted small">@(((DateTime)context.Value).ToString("MMM dd, yyyy"))</span>
+                            </CellDisplayTemplate>
+                        </DxGridDataColumn>
+                        <DxGridDataColumn FieldName="Sale.TotalAmount" Caption="Amount" Width="150px" HeaderCssClass="text-end" CssClass="text-end fw-bold">
+                            <CellDisplayTemplate>
+                                <span>@($"{currencySymbol} {((decimal)context.Value).ToString("N2")}")</span>
+                            </CellDisplayTemplate>
+                        </DxGridDataColumn>
+                        <DxGridDataColumn FieldName="IsPrinted" Caption="Status" Width="120px" HeaderCssClass="text-center" CssClass="text-center">
+                            <CellDisplayTemplate>
+                                <span class='trend-badge @((bool)context.Value ? "positive" : "negative")' style="min-width: 80px; justify-content: center;">
+                                    @((bool)context.Value ? "PRINTED" : "DRAFT")
+                                </span>
+                            </CellDisplayTemplate>
+                        </DxGridDataColumn>
+                    </Columns>
+                </DxGrid>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Invoice> invoices = new List<Invoice>();
+    private string currencySymbol = "$";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (LoginManager.CurrentUser == null)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        await LoadInvoices();
+        await LoadOrganizationSettings();
+    }
+
+    private async Task LoadOrganizationSettings()
+    {
+        var org = await DbContext.Organizations.FirstOrDefaultAsync();
+        currencySymbol = CurrencyHelper.GetCurrencySymbol(org);
+    }
+
+    private async Task LoadInvoices()
+    {
+        invoices = await DbContext.Invoices
+            .Include(i => i.Sale)
+                .ThenInclude(s => s.Customer)
+            .OrderByDescending(i => i.InvoiceDate)
+            .ToListAsync();
+    }
+}
+

@@ -1,0 +1,261 @@
+@page "/suppliers/new"
+@page "/suppliers/{Id:int}"
+@using EyeHospitalPOS.Models
+@using EyeHospitalPOS.Helper
+@using EyeHospitalPOS.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject NavigationManager Navigation
+@inject LoginManager LoginManager
+@inject IJSRuntime JSRuntime
+
+<PageTitle>@(Id == 0 ? "New Supplier" : CurrentSupplier.Name) - Eye Hospital POS</PageTitle>
+
+@if (LoginManager.CurrentUser == null)
+{
+    <div class="alert alert-warning m-4">Please login to access this page.</div>
+}
+else
+{
+    <div class="page-container" style="padding-bottom: 80px;">
+        
+        <!-- Sticky Toolbar -->
+        <div class="sticky-top d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-3">
+                <DxButton RenderStyle="ButtonRenderStyle.Secondary" 
+                          IconCssClass="fa-solid fa-arrow-left" 
+                          SizeMode="SizeMode.Small"
+                          CssClass="btn-toolbar"
+                          Click="@(() => Navigation.NavigateTo("/supplier"))" />
+                
+                <div>
+                    <h5 class="mb-0 fw-bold">@(Id == 0 ? "New Supplier" : CurrentSupplier.Name)</h5>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge @(CurrentSupplier.IsActive ? "bg-success" : "bg-secondary") text-white">
+                            @(CurrentSupplier.IsActive ? "Active" : "Inactive")
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="toolbar-actions">
+                <DxButton Text="Save" 
+                          RenderStyle="ButtonRenderStyle.Success" 
+                          IconCssClass="fa-solid fa-floppy-disk"
+                          SizeMode="SizeMode.Small"
+                          CssClass="btn-toolbar"
+                          Click="SaveSupplier" />
+                
+                @if (Id != 0)
+                {
+                    <DxButton Text="Delete" 
+                              RenderStyle="ButtonRenderStyle.Danger" 
+                              RenderStyleMode="ButtonRenderStyleMode.Outline"
+                              IconCssClass="fa-solid fa-trash"
+                              SizeMode="SizeMode.Small"
+                              CssClass="btn-toolbar"
+                              Click="DeleteSupplier" />
+                }
+            </div>
+        </div>
+
+        <!-- Header Information Form -->
+        <div class="premium-card mt-3 mx-4">
+            <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; padding: 0.75rem 1.25rem;">
+                <h6 class="text-white mb-0 fw-semibold">Supplier Information</h6>
+            </div>
+            <div class="card-body p-4">
+                <DxFormLayout Data="@CurrentSupplier" ItemSpacing="10px" CaptionPosition="CaptionPosition.Horizontal">
+                    <DxFormLayoutGroup ColSpanLg="12" CssClass="group-transparent">
+                        <!-- Row 1: Supplier Name and Phone -->
+                        <DxFormLayoutItem Caption="Supplier Name:" ColSpanLg="6" ColSpanMd="12">
+                            <DxTextBox @bind-Text="@CurrentSupplier.Name" 
+                                       EnableValidation="false" />
+                        </DxFormLayoutItem>
+                        <DxFormLayoutItem Caption="Phone:" ColSpanLg="6" ColSpanMd="12">
+                            <DxTextBox @bind-Text="@CurrentSupplier.Phone" 
+                                       EnableValidation="false" />
+                        </DxFormLayoutItem>
+                        
+                        <!-- Row 2: Email and Status -->
+                        <DxFormLayoutItem Caption="Email:" ColSpanLg="6" ColSpanMd="12">
+                            <DxTextBox @bind-Text="@CurrentSupplier.Email" 
+                                       EnableValidation="false" />
+                        </DxFormLayoutItem>
+                        <DxFormLayoutItem Caption="Status:" ColSpanLg="6" ColSpanMd="12">
+                            <DxCheckBox @bind-Checked="@CurrentSupplier.IsActive">
+                                <span class="tiny fw-bold text-muted">Active Supplier Status</span>
+                            </DxCheckBox>
+                        </DxFormLayoutItem>
+                        
+                        <!-- Row 3: Address (full width) -->
+                        <DxFormLayoutItem Caption="Address:" ColSpanLg="12">
+                            <DxMemo @bind-Text="@CurrentSupplier.Address" 
+                                    Rows="4"
+                                    EnableValidation="false" />
+                        </DxFormLayoutItem>
+                    </DxFormLayoutGroup>
+                </DxFormLayout>
+            </div>
+        </div>
+
+        <!-- Contact Details Card -->
+        <div class="premium-card mt-3 mx-4">
+            <div class="card-header py-2 d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fa-solid fa-address-card text-info"></i>
+                    <span class="fw-bold">Additional Information</span>
+                </div>
+            </div>
+            
+            <div class="card-body p-4">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="info-item mb-3">
+                            <label class="form-label tiny fw-bold text-uppercase text-muted">Organization</label>
+                            <p class="mb-0">@(string.IsNullOrEmpty(CurrentSupplier.Name) ? "N/A" : CurrentSupplier.Name)</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-item mb-3">
+                            <label class="form-label tiny fw-bold text-uppercase text-muted">Web Site</label>
+                            <p class="mb-0">N/A</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-item mb-3">
+                            <label class="form-label tiny fw-bold text-uppercase text-muted">Display Name</label>
+                            <p class="mb-0">@(string.IsNullOrEmpty(CurrentSupplier.Name) ? "N/A" : CurrentSupplier.Name)</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="info-item mb-3">
+                            <label class="form-label tiny fw-bold text-uppercase text-muted">Profiles</label>
+                            <p class="mb-0">Default Profile</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (Id != 0)
+        {
+            <!-- Related Tabs Section -->
+            <div class="premium-card mt-3 mx-4">
+                <div class="card-header bg-light py-2">
+                    <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active" data-bs-toggle="tab" href="#purchase-orders">
+                                <i class="fa-solid fa-file-invoice me-2"></i>Purchase Orders
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#inventory-receiving">
+                                <i class="fa-solid fa-truck-ramp-box me-2"></i>Inventory Receiving
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#phone-numbers">
+                                <i class="fa-solid fa-phone me-2"></i>Phone Numbers
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="card-body p-0">
+                    <div class="tab-content">
+                        <div class="tab-pane fade show active p-3" id="purchase-orders">
+                            <p class="text-muted">Purchase orders for this supplier will appear here.</p>
+                        </div>
+                        <div class="tab-pane fade p-3" id="inventory-receiving">
+                            <p class="text-muted">Inventory receiving records for this supplier will appear here.</p>
+                        </div>
+                        <div class="tab-pane fade p-3" id="phone-numbers">
+                            <p class="text-muted">Additional phone numbers will appear here.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    
+    private Supplier CurrentSupplier = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (LoginManager.CurrentUser == null)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        if (Id != 0)
+        {
+            var existing = await DbContext.Suppliers.FindAsync(Id);
+            if (existing != null)
+            {
+                CurrentSupplier = existing;
+            }
+            else
+            {
+                Navigation.NavigateTo("/supplier");
+            }
+        }
+        else
+        {
+            CurrentSupplier.IsActive = true;
+        }
+    }
+
+    private async Task SaveSupplier()
+    {
+        // Validation
+        if (string.IsNullOrWhiteSpace(CurrentSupplier.Name))
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Supplier name is required.");
+            return;
+        }
+
+        try
+        {
+            if (Id == 0)
+            {
+                await DbContext.Suppliers.AddAsync(CurrentSupplier);
+            }
+            else
+            {
+                DbContext.Suppliers.Update(CurrentSupplier);
+            }
+
+            await DbContext.SaveChangesAsync();
+            await JSRuntime.InvokeVoidAsync("alert", "Supplier saved successfully!");
+            Navigation.NavigateTo("/supplier");
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error saving supplier: {ex.Message}");
+        }
+    }
+
+    private async Task DeleteSupplier()
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to delete this supplier?"))
+            return;
+
+        try
+        {
+            DbContext.Suppliers.Remove(CurrentSupplier);
+            await DbContext.SaveChangesAsync();
+            await JSRuntime.InvokeVoidAsync("alert", "Supplier deleted successfully!");
+            Navigation.NavigateTo("/supplier");
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error deleting supplier: {ex.Message}");
+        }
+    }
+}

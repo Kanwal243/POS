@@ -1,0 +1,94 @@
+﻿@inherits LayoutComponentBase
+@inject EyeHospitalPOS.Helper.LoginManager LoginManager
+@inject IJSRuntime JSRuntime
+
+<div class="page">
+    @if (LoginManager.IsLoggedIn)
+    {
+        <div class="sidebar @(isDrawerOpen ? "drawer-open" : "") @(isSidebarCollapsed ? "collapsed" : "")">
+            <NavMenu OnToggleSidebar="ToggleSidebar" Collapsed="isSidebarCollapsed" />
+        </div>
+        
+        @if (isDrawerOpen)
+        {
+            <div class="drawer-overlay" @onclick="ToggleDrawer"></div>
+        }
+    }
+
+    <div class="main">
+        @if (LoginManager.IsLoggedIn)
+        {
+                <div class="sidebar-header border-start-0">
+                    <div class="d-flex align-items-center">
+                        <button class="sidebar-toggle me-3" @onclick="ToggleSidebar">
+                            <i class="fa-solid fa-bars"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="header-actions">
+                        <button class="btn btn-link text-muted me-3 p-0 theme-toggle shadow-none" @onclick="ToggleTheme">
+                            <i class="fa-solid @(isDarkMode ? "fa-sun" : "fa-moon") fs-5"></i>
+                        </button>
+                        <LoginDisplay />
+                    </div>
+                </div>
+        }
+
+        <div class="content">
+            @Body
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool isDrawerOpen = false;
+    private bool isSidebarCollapsed = false;
+    private bool isDarkMode = false;
+    private bool isInitialized = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Initialize LoginManager from session storage (restores session on refresh)
+        // This is safe during prerendering because it uses HttpContext/Session
+        await LoginManager.InitializeAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                // JS interop is only available after first render (client-side)
+                var theme = await JSRuntime.InvokeAsync<string>("getTheme");
+                isDarkMode = theme == "dark";
+                isInitialized = true;
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting theme: {ex.Message}");
+                isInitialized = true;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private async Task ToggleTheme()
+    {
+        isDarkMode = !isDarkMode;
+        await JSRuntime.InvokeVoidAsync("setTheme", isDarkMode ? "dark" : "light");
+    }
+
+    private void ToggleDrawer()
+    {
+        isDrawerOpen = !isDrawerOpen;
+    }
+
+    private void ToggleSidebar()
+    {
+        isDrawerOpen = !isDrawerOpen;
+        isSidebarCollapsed = !isSidebarCollapsed;
+        StateHasChanged();
+    }
+}

@@ -1,0 +1,188 @@
+@page "/product-categories/new"
+@page "/product-categories/{Id:int}"
+@using EyeHospitalPOS.Models
+@using EyeHospitalPOS.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject NavigationManager Navigation
+@inject EyeHospitalPOS.Helper.LoginManager LoginManager
+
+<PageTitle>@(Id == 0 ? "New Category" : CurrentCategory.Name) - Product Categories</PageTitle>
+
+@if (LoginManager.CurrentUser == null)
+{
+    <div class="alert alert-warning m-4">Please login to access this page.</div>
+}
+else
+{
+    <div class="page-container p-4">
+        <!-- Toolbar -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div class="d-flex align-items-center gap-3">
+                <DxButton RenderStyle="ButtonRenderStyle.Secondary"
+                          IconCssClass="fa-solid fa-arrow-left"
+                          SizeMode="SizeMode.Small"
+                          CssClass="btn-toolbar"
+                          Click="@(() => Navigation.NavigateTo("/product-categories"))" />
+                <div>
+                    <h3 class="mb-1 fw-bold">@(Id == 0 ? "New Category" : "Edit Category")</h3>
+                    <p class="text-muted tiny mb-0">@(Id == 0 ? "Create a new product grouping" : $"Editing {CurrentCategory.Name}")</p>
+                </div>
+            </div>
+            <div class="toolbar-actions">
+                <DxButton Text="Save Category"
+                          RenderStyle="ButtonRenderStyle.Success"
+                          IconCssClass="fa-solid fa-floppy-disk"
+                          SizeMode="SizeMode.Small"
+                          CssClass="btn-toolbar"
+                          Click="SaveCategory" />
+            </div>
+        </div>
+
+        <div class="premium-card">
+            <div class="card-header bg-light py-2">
+                <h6 class="mb-0 fw-bold">Product Category</h6>
+            </div>
+            <div class="card-body p-4">
+                <DxFormLayout Data="@CurrentCategory" ItemSpacing="15px">
+                    <DxFormLayoutGroup ColSpanLg="12" CaptionPosition="CaptionPosition.Vertical">
+                        <!-- Top Row: Code and Show In Lists -->
+                        <DxFormLayoutItem Caption="Product Category Code:" ColSpanMd="6">
+                            <DxTextBox @bind-Text="@CurrentLocationCode" NullText="e.g. 0001" />
+                        </DxFormLayoutItem>
+                         <DxFormLayoutItem ColSpanMd="6" Context="chkContext">
+                            <div class="pt-4">
+                                <DxCheckBox @bind-Checked="@CurrentCategory.ShowInSelectionList">Show In Selection Lists</DxCheckBox>
+                            </div>
+                        </DxFormLayoutItem>
+
+                        <!-- Middle Row: Name and Status -->
+                         <DxFormLayoutItem Caption="Product Category Name:" ColSpanMd="6">
+                            <DxTextBox @bind-Text="@CurrentCategory.Name" />
+                        </DxFormLayoutItem>
+                         <DxFormLayoutItem Caption="Status:" ColSpanMd="6">
+                            <DxComboBox Data="@(new List<string> { "Active", "Inactive" })"
+                                        Value="@(CurrentCategory.IsActive ? "Active" : "Inactive")"
+                                        ValueChanged="@((string v) => CurrentCategory.IsActive = (v == "Active"))" />
+                        </DxFormLayoutItem>
+
+                        <!-- Bottom Row: Parent Category -->
+                        <DxFormLayoutItem Caption="Parent Category:" ColSpanMd="12">
+                            <DxComboBox Data="@ParentCategories"
+                                        @bind-Value="@CurrentCategory.ParentId"
+                                        ValueFieldName="Id"
+                                        TextFieldName="Name"
+                                        ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto"
+                                        NullText="Select Parent Category (Optional)" />
+                        </DxFormLayoutItem>
+                    </DxFormLayoutGroup>
+                </DxFormLayout>
+            </div>
+            
+            @if (Id != 0)
+            {
+                <div class="card-body p-0 border-top">
+                    <DxTabs RenderMode="TabsRenderMode.AllTabs">
+                        <DxTabPage Text="Products">
+                            <div class="p-3">
+                                <DxGrid Data="@CategoryProducts" PageSize="10" CssClass="enterprise-grid">
+                                    <Columns>
+                                        <DxGridDataColumn FieldName="Name" Caption="Product Name" MinWidth="200" />
+                                        <DxGridDataColumn FieldName="Barcode" Caption="Product Code" Width="120px" />
+                                        <DxGridDataColumn FieldName="StockQuantity" Caption="Qty" Width="100px" />
+                                        <DxGridDataColumn FieldName="CostPrice" Caption="Cost" Width="100px">
+                                             <CellDisplayTemplate>@($"{currencySymbol} {((decimal)context.Value).ToString("N2")}")</CellDisplayTemplate>
+                                        </DxGridDataColumn>
+                                        <DxGridDataColumn FieldName="SalePrice" Caption="Price" Width="100px">
+                                             <CellDisplayTemplate>@($"{currencySymbol} {((decimal)context.Value).ToString("N2")}")</CellDisplayTemplate>
+                                        </DxGridDataColumn>
+                                        <DxGridDataColumn FieldName="IsActive" Caption="Status" Width="100px">
+                                            <CellDisplayTemplate>
+                                                <span class='@( (bool)context.Value ? "text-success" : "text-danger" )'>
+                                                    @((bool)context.Value ? "Active" : "Inactive")
+                                                </span>
+                                            </CellDisplayTemplate>
+                                        </DxGridDataColumn>
+                                    </Columns>
+                                </DxGrid>
+                            </div>
+                        </DxTabPage>
+                    </DxTabs>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    
+    private ProductCategory CurrentCategory = new ProductCategory();
+    private List<ProductCategory> AllCategories = new List<ProductCategory>();
+    private List<ProductCategory> ParentCategories => AllCategories.Where(c => c.Id != CurrentCategory.Id).ToList();
+    private List<Product> CategoryProducts = new List<Product>();
+    private string currencySymbol = "$";
+    
+    // Binding helper for Code (handles nulls if needed, though model init helps)
+    private string CurrentLocationCode
+    {
+        get => CurrentCategory.Code;
+        set => CurrentCategory.Code = value;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (LoginManager.CurrentUser == null)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        await LoadData();
+        await LoadOrganizationSettings();
+    }
+
+    private async Task LoadOrganizationSettings()
+    {
+        var org = await DbContext.Organizations.FirstOrDefaultAsync();
+        currencySymbol = EyeHospitalPOS.Helper.CurrencyHelper.GetCurrencySymbol(org);
+    }
+
+    private async Task LoadData()
+    {
+        AllCategories = await DbContext.ProductCategories.ToListAsync();
+
+        if (Id != 0)
+        {
+            var existing = await DbContext.ProductCategories
+                .Include(c => c.Products)
+                .FirstOrDefaultAsync(c => c.Id == Id);
+                
+            if (existing != null)
+            {
+                CurrentCategory = existing;
+                if (CurrentCategory.Products != null)
+                {
+                    CategoryProducts = CurrentCategory.Products.ToList();
+                }
+            }
+        }
+    }
+
+    private async Task SaveCategory()
+    {
+        if (string.IsNullOrWhiteSpace(CurrentCategory.Name)) return;
+
+        if (Id == 0)
+        {
+            await DbContext.ProductCategories.AddAsync(CurrentCategory);
+        }
+        else
+        {
+            DbContext.ProductCategories.Update(CurrentCategory);
+        }
+
+        await DbContext.SaveChangesAsync();
+        Navigation.NavigateTo("/product-categories");
+    }
+}

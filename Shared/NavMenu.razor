@@ -1,0 +1,232 @@
+﻿@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@implements IDisposable
+
+<div class="sidebar-menu @(Collapsed ? "collapsed" : "")">
+    <div class="sidebar-header">
+        <div class="sidebar-brand-container">
+            <div class="sidebar-brand">POS</div>
+        </div>
+        <button class="btn btn-link d-md-none text-muted p-0" @onclick="OnToggleSidebar">
+            <i class="fa-solid fa-xmark h4 mb-0"></i>
+        </button>
+    </div>
+    <nav class="flex-column px-3 py-2">
+        <div class="nav-section-label mb-2 opacity-50 tiny fw-bold mt-4">MENU</div>
+        
+        <!-- Home -->
+        <div class="nav-item mb-1">
+            <a href="/dashboard" class="@MenuItemCssClass("/dashboard")">
+                <i class="fa-solid fa-house-chimney me-2"></i> <span class="nav-label">Dashboard</span>
+            </a>
+        </div>
+
+        <!-- Default (User Management) -->
+        <AuthorizeView Roles="Administrator,Manager">
+            <div class="nav-group mb-1 @(IsExpanded("default") ? "active" : "")">
+                <div class="nav-section-header" @onclick="@(() => ToggleMenu("default"))">
+                    <div class="header-content">
+                        <i class="fa-solid fa-circle-user me-2"></i>
+                        <span>Default</span>
+                    </div>
+                    <i class="fa-solid fa-chevron-down header-chevron tiny @(IsExpanded("default") ? "rotate-180" : "")"></i>
+                </div>
+                <div class="nav-group-items">
+                    <!-- My Details -->
+                    <div class="nav-item">
+                        <a href="/profile" class="@MenuItemCssClass("/profile")">
+                            <span class="nav-label">My Details</span>
+                        </a>
+                    </div>
+                    <div class="nav-item">
+                        <a href="/roles" class="@MenuItemCssClass("/roles")">
+                            <span class="nav-label">Roles</span>
+                        </a>
+                    </div>
+                    <div class="nav-item">
+                        <a href="/users" class="@MenuItemCssClass("/users")">
+                            <span class="nav-label">Users</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </AuthorizeView>
+
+        <!-- Inventory -->
+        <div class="nav-group mb-1 @(IsExpanded("inventory") ? "active" : "")">
+            <div class="nav-section-header" @onclick="@(() => ToggleMenu("inventory"))">
+                <div class="header-content">
+                    <i class="fa-solid fa-boxes-stacked me-2"></i>
+                    <span>Inventory</span>
+                </div>
+                <i class="fa-solid fa-chevron-down header-chevron tiny @(IsExpanded("inventory") ? "rotate-180" : "")"></i>
+            </div>
+            <div class="nav-group-items">
+                <div class="nav-item">
+                    <a href="/inventory-receiving" class="@MenuItemCssClass("/inventory-receiving")">
+                        <span class="nav-label">Inventory Receiving</span>
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a href="/purchase-order" class="@MenuItemCssClass("/purchase-order")">
+                        <span class="nav-label">Purchase Orders</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sales -->
+        <div class="nav-group mb-1 @(IsExpanded("sales") ? "active" : "")">
+            <div class="nav-section-header" @onclick="@(() => ToggleMenu("sales"))">
+                <div class="header-content">
+                    <i class="fa-solid fa-cart-shopping me-2"></i>
+                    <span>Sales</span>
+                </div>
+                <i class="fa-solid fa-chevron-down header-chevron tiny @(IsExpanded("sales") ? "rotate-180" : "")"></i>
+            </div>
+            <div class="nav-group-items">
+                <div class="nav-item">
+                    <a href="/invoices" class="@MenuItemCssClass("/invoices")">
+                        <span class="nav-label">Invoices</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="nav-section-label mb-2 opacity-50 tiny fw-bold mt-4">SETUP</div>
+
+        <!-- Inventory Setup -->
+        <div class="nav-group mb-1 @(IsExpanded("inventorysetup") ? "active" : "")">
+            <div class="nav-section-header" @onclick="@(() => ToggleMenu("inventorysetup"))">
+                <div class="header-content">
+                    <i class="fa-solid fa-sliders me-2"></i>
+                    <span>Inventory Setup</span>
+                </div>
+                <i class="fa-solid fa-chevron-down header-chevron tiny @(IsExpanded("inventorysetup") ? "rotate-180" : "")"></i>
+            </div>
+            <div class="nav-group-items">
+                <div class="nav-item"><a href="/customer" class="@MenuItemCssClass("/customer")"><span class="nav-label">Customers</span></a></div>
+                <div class="nav-item"><a href="/item-locations" class="@MenuItemCssClass("/item-locations")"><span class="nav-label">Item Locations</span></a></div>
+                <div class="nav-item"><a href="/product" class="@MenuItemCssClass("/product")"><span class="nav-label">Products</span></a></div>
+                <div class="nav-item"><a href="/product-categories" class="@MenuItemCssClass("/product-categories")"><span class="nav-label">Categories</span></a></div>
+                <div class="nav-item"><a href="/product-types" class="@MenuItemCssClass("/product-types")"><span class="nav-label">Product Types</span></a></div>
+                <div class="nav-item"><a href="/supplier" class="@MenuItemCssClass("/supplier")"><span class="nav-label">Suppliers</span></a></div>
+            </div>
+        </div>
+
+        <!-- System Setup -->
+        <AuthorizeView Roles="Administrator">
+            <div class="nav-group mb-1 @(IsExpanded("systemsetup") ? "active" : "")">
+                <div class="nav-section-header" @onclick="@(() => ToggleMenu("systemsetup"))">
+                    <div class="header-content">
+                        <i class="fa-solid fa-gear me-2"></i>
+                        <span>System</span>
+                    </div>
+                    <i class="fa-solid fa-chevron-down header-chevron tiny @(IsExpanded("systemsetup") ? "rotate-180" : "")"></i>
+                </div>
+                <div class="nav-group-items">
+                    <div class="nav-item">
+                        <a href="/info" class="@MenuItemCssClass("/info")">
+                            <span class="nav-label">Organization Info</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </AuthorizeView>
+
+        <div class="nav-section-label mb-2 opacity-50 tiny fw-bold mt-4">OTHERS</div>
+        <div class="nav-item mb-1">
+            <a href="/reports" class="@MenuItemCssClass("/reports")">
+                <i class="fa-solid fa-chart-line me-2"></i> <span class="nav-label">Reports</span>
+            </a>
+        </div>
+    </nav>
+</div>
+
+@code { 
+    [Parameter]
+    public EventCallback OnToggleSidebar { get; set; }
+
+    [Parameter]
+    public bool Collapsed { get; set; }
+
+    private string? currentLocalPath;
+    private string? currentlyExpandedNode = null;
+
+    protected override void OnInitialized()
+    {
+        currentLocalPath = new Uri(NavigationManager.Uri).LocalPath;
+        NavigationManager.LocationChanged += OnLocationChanged;
+        DetermineExpandedNodeFromPath();
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        currentLocalPath = new Uri(NavigationManager.Uri).LocalPath;
+        DetermineExpandedNodeFromPath();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void DetermineExpandedNodeFromPath()
+    {
+        if (string.IsNullOrEmpty(currentLocalPath))
+            return;
+
+        if (currentLocalPath.StartsWith("/profile", StringComparison.OrdinalIgnoreCase) || 
+            currentLocalPath.StartsWith("/roles", StringComparison.OrdinalIgnoreCase) ||
+            currentLocalPath.StartsWith("/users", StringComparison.OrdinalIgnoreCase))
+            currentlyExpandedNode = "default";
+        else if (currentLocalPath.StartsWith("/inventory-receiving", StringComparison.OrdinalIgnoreCase) || 
+            currentLocalPath.StartsWith("/purchase-order", StringComparison.OrdinalIgnoreCase))
+            currentlyExpandedNode = "inventory";
+        else if (currentLocalPath.StartsWith("/customer", StringComparison.OrdinalIgnoreCase) || 
+                 currentLocalPath.StartsWith("/item-locations", StringComparison.OrdinalIgnoreCase) ||
+                 currentLocalPath.StartsWith("/product", StringComparison.OrdinalIgnoreCase) ||
+                 currentLocalPath.StartsWith("/product-categories", StringComparison.OrdinalIgnoreCase) ||
+                 currentLocalPath.StartsWith("/product-types", StringComparison.OrdinalIgnoreCase) ||
+                 currentLocalPath.StartsWith("/supplier", StringComparison.OrdinalIgnoreCase))
+            currentlyExpandedNode = "inventorysetup";
+        else if (currentLocalPath.StartsWith("/reports", StringComparison.OrdinalIgnoreCase))
+            currentlyExpandedNode = "reports";
+        else if (currentLocalPath.StartsWith("/invoices", StringComparison.OrdinalIgnoreCase))
+            currentlyExpandedNode = "sales";
+        else if (currentLocalPath.StartsWith("/info", StringComparison.OrdinalIgnoreCase))
+            currentlyExpandedNode = "systemsetup";
+        // Do not reset currentlyExpandedNode if user is just clicking around, 
+        // effectively providing the "reset" behavior by keeping it stable or closing on navigation.
+    }
+
+    private async Task ToggleMenu(string nodeName)
+    {
+        if (Collapsed)
+        {
+            await OnToggleSidebar.InvokeAsync();
+        }
+
+        if (currentlyExpandedNode == nodeName)
+            currentlyExpandedNode = null;
+        else
+            currentlyExpandedNode = nodeName;
+    }
+
+    private string? MenuItemCssClass(string itemPath)
+    {
+        if (currentLocalPath == null) return null;
+        
+        // Exact match or sub-path match (e.g., /users highlights for /users/new)
+        bool isActive = string.Equals(currentLocalPath, itemPath, StringComparison.OrdinalIgnoreCase) || 
+                        (currentLocalPath.StartsWith(itemPath + "/", StringComparison.OrdinalIgnoreCase) && itemPath != "/");
+        
+        return isActive ? "active" : null;
+    }
+
+    private bool IsExpanded(string nodeName)
+    {
+        return currentlyExpandedNode == nodeName;
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+}

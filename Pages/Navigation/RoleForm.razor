@@ -1,0 +1,231 @@
+@page "/roles/new"
+@page "/roles/edit/{Id}"
+@using EyeHospitalPOS.Models
+@using EyeHospitalPOS.Helper
+@using EyeHospitalPOS.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject LoginManager LoginManager
+@inject NavigationManager Navigation
+
+@attribute [Authorize(Roles = "Administrator,Manager")]
+
+<PageTitle>@(string.IsNullOrEmpty(Id) ? "New Role" : "Edit Role") - Eye Hospital POS</PageTitle>
+
+<div class="page-container p-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h3 class="mb-1 fw-bold">@(string.IsNullOrEmpty(Id) ? "Create New Role" : "Edit Role Details")</h3>
+                <p class="text-muted tiny mb-0">Define role properties and basic configuration</p>
+            </div>
+            <div class="toolbar-actions">
+                <DxButton RenderStyle="ButtonRenderStyle.Secondary" 
+                          IconCssClass="fa-solid fa-arrow-left" 
+                          SizeMode="SizeMode.Small"
+                          CssClass="btn-toolbar"
+                          Click="@(() => Navigation.NavigateTo("/roles"))" />
+                
+                <DxButton Text="@(string.IsNullOrEmpty(Id) ? "Save Role" : "Save Changes")" 
+                          RenderStyle="ButtonRenderStyle.Success" 
+                          IconCssClass="fa-solid fa-floppy-disk"
+                          SizeMode="SizeMode.Small"
+                          CssClass="btn-toolbar"
+                          SubmitFormOnClick="true" />
+            </div>
+        </div>
+
+        @if (showError)
+        {
+            <div class="alert alert-danger mb-4">@errorMessage</div>
+        }
+
+        <div class="row g-4">
+            <!-- Form Section -->
+            <div class="col-lg-8">
+                <div class="premium-card h-100 shadow-sm border-0 overflow-hidden">
+                    <div class="card-header premium-header p-4 border-0">
+                        <h5 class="fw-bold mb-0 text-white d-flex align-items-center">
+                            <i class="fa-solid fa-shield-halved me-3 opacity-75"></i>Role Information
+                        </h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <EditForm Model="@role" OnValidSubmit="HandleValidSubmit">
+                            <DataAnnotationsValidator />
+                            
+                            <div class="row g-4">
+                                <div class="col-md-6">
+                                    <div class="form-group-custom">
+                                        <label class="form-label-custom">Role Name</label>
+                                    <DxTextBox @bind-Text="@role.Name" 
+                                               ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto" />
+                                        <ValidationMessage For="@(() => role.Name)" />
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <div class="form-group-custom">
+                                        <label class="form-label-custom">Parent Role (Optional)</label>
+                                    <DxComboBox Data="@availableRoles"
+                                                @bind-Value="@role.ParentRoleId"
+                                                TextFieldName="Name"
+                                                ValueFieldName="Id"
+                                                AllowUserInput="false"
+                                                ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto" />
+                                    </div>
+                                </div>
+
+                                <div class="col-12">
+                                    <div class="form-group-custom">
+                                        <label class="form-label-custom">Description</label>
+                                        <DxMemo @bind-Text="@role.Description" Rows="3" CssClass="premium-memo-field" />
+                                        <ValidationMessage For="@(() => role.Description)" />
+                                    </div>
+                                </div>
+
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Permissions Sidebar -->
+            <div class="col-lg-4">
+                <div class="premium-card mb-4 shadow-sm border-0">
+                    <div class="card-header premium-header-alt p-4">
+                        <h5 class="fw-bold mb-0 text-white d-flex align-items-center">
+                            <i class="fa-solid fa-key me-3"></i>Permissions
+                        </h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="status-option mb-3 p-3 rounded-3 border @(role.IsActive ? "border-success bg-light-success" : "border-danger bg-light-danger")">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="fw-bold @(role.IsActive ? "text-success" : "text-danger") mb-0">Role Status</div>
+                                    <div class="tiny text-muted">Toggle availability</div>
+                                </div>
+                                <DxCheckBox @bind-Checked="@role.IsActive" />
+                            </div>
+                        </div>
+
+                        <div class="settings-pill mb-3 p-3 rounded-3 border bg-white shadow-sm d-flex align-items-center">
+                            <DxCheckBox @bind-Checked="@role.IsAdministrative" />
+                            <div class="ms-3">
+                                <div class="fw-bold small">Administrative</div>
+                                <div class="tiny text-muted">Full system authority</div>
+                            </div>
+                        </div>
+
+                        <div class="settings-pill mb-3 p-3 rounded-3 border bg-white shadow-sm d-flex align-items-center">
+                            <DxCheckBox @bind-Checked="@role.CanEditModel" />
+                            <div class="ms-3">
+                                <div class="fw-bold small">Model Editing</div>
+                                <div class="tiny text-muted">Can modify core data</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<style>
+    .premium-header {
+        background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+        border-radius: 12px 12px 0 0 !important;
+    }
+
+    .premium-header-alt {
+        background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
+        border-radius: 12px 12px 0 0 !important;
+    }
+
+    .form-group-custom { margin-bottom: 0.5rem; }
+    .form-label-custom {
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: #475569;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+
+    .bg-light-success { background-color: rgba(34, 197, 94, 0.08); }
+    .bg-light-danger { background-color: rgba(234, 84, 85, 0.08); }
+    .status-option { border-width: 2px !important; }
+    .settings-pill:hover { border-color: #4e73df !important; }
+</style>
+
+@code {
+    [Parameter] public string? Id { get; set; }
+    
+    private Role role = new Role { IsActive = true };
+    private List<Role> availableRoles = new List<Role>();
+    private bool showError = false;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Skip manual check as [Authorize] handles it.
+        await LoadRoleData();
+    }
+
+    private async Task LoadRoleData()
+    {
+        // Load roles for parent selection (excluding current role if editing)
+        var query = DbContext.Roles.AsNoTracking().Where(r => r.IsActive);
+        if (!string.IsNullOrEmpty(Id))
+        {
+            query = query.Where(r => r.Id != Id);
+        }
+        availableRoles = await query.ToListAsync();
+
+        if (!string.IsNullOrEmpty(Id))
+        {
+            // Load role for editing
+            var existingRole = await DbContext.Roles.AsNoTracking().FirstOrDefaultAsync(r => r.Id == Id);
+            if (existingRole != null)
+            {
+                role = existingRole;
+            }
+            else
+            {
+                errorMessage = "Role not found.";
+                showError = true;
+            }
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(role.Id))
+            {
+                // Create New
+                role.Id = Guid.NewGuid().ToString();
+                await DbContext.Roles.AddAsync(role);
+            }
+            else
+            {
+                // Update Existing
+                // Handle tracking conflict by finding the tracked entity if it exists
+                var trackedRole = await DbContext.Roles.FindAsync(role.Id);
+                if (trackedRole != null)
+                {
+                    DbContext.Entry(trackedRole).CurrentValues.SetValues(role);
+                }
+                else
+                {
+                    DbContext.Roles.Update(role);
+                }
+            }
+
+            await DbContext.SaveChangesAsync();
+            Navigation.NavigateTo("/roles");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error saving role: {ex.Message}";
+            showError = true;
+        }
+    }
+}
