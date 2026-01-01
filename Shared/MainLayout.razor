@@ -3,8 +3,8 @@
 @inject IJSRuntime JSRuntime
 
 <div class="page">
-    @if (LoginManager.IsLoggedIn)
-    {
+    @* @if (LoginManager.IsLoggedIn)
+    { *@
         <div class="sidebar @(isDrawerOpen ? "drawer-open" : "") @(isSidebarCollapsed ? "collapsed" : "")">
             <NavMenu OnToggleSidebar="ToggleSidebar" Collapsed="isSidebarCollapsed" />
         </div>
@@ -13,11 +13,11 @@
         {
             <div class="drawer-overlay" @onclick="ToggleDrawer"></div>
         }
-    }
+    @* } *@
 
     <div class="main">
-        @if (LoginManager.IsLoggedIn)
-        {
+        @* @if (LoginManager.IsLoggedIn)
+        { *@
                 <div class="sidebar-header border-start-0">
                     <div class="d-flex align-items-center">
                         <button class="sidebar-toggle me-3" @onclick="ToggleSidebar">
@@ -32,7 +32,7 @@
                         <LoginDisplay />
                     </div>
                 </div>
-        }
+        @* } *@
 
         <div class="content">
             @Body
@@ -51,18 +51,26 @@
         // Initialize LoginManager from session storage (restores session on refresh)
         // This is safe during prerendering because it uses HttpContext/Session
         await LoginManager.InitializeAsync();
+        
+        // Debug: Log if user is loaded
+        Console.WriteLine($"MainLayout: LoginManager.IsLoggedIn = {LoginManager.IsLoggedIn}, User = {LoginManager.CurrentUser?.UserName}");
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
+            // Re-initialize after first render to ensure session is loaded
+            await LoginManager.InitializeAsync();
+            
             try
             {
                 // JS interop is only available after first render (client-side)
                 var theme = await JSRuntime.InvokeAsync<string>("getTheme");
                 isDarkMode = theme == "dark";
                 isInitialized = true;
+                
+                // Force UI update after everything is ready
                 StateHasChanged();
             }
             catch (Exception ex)
@@ -83,11 +91,22 @@
     private void ToggleDrawer()
     {
         isDrawerOpen = !isDrawerOpen;
+        StateHasChanged();
     }
 
     private void ToggleSidebar()
     {
-        isDrawerOpen = !isDrawerOpen;
+        // For mobile: toggle drawer
+        // For desktop: toggle sidebar collapse
+        if (isDrawerOpen)
+        {
+            isDrawerOpen = false;
+        }
+        else
+        {
+            isDrawerOpen = true;
+        }
+        
         isSidebarCollapsed = !isSidebarCollapsed;
         StateHasChanged();
     }

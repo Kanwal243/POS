@@ -67,7 +67,12 @@ namespace EyeHospitalPOS.Helper
         **/
         public async Task InitializeAsync()
         {
-            if (_initialized) return;
+            // Allow re-initialization if user is null (session might not have been loaded yet)
+            if (_initialized && _currentUser != null) 
+            {
+                Console.WriteLine($"LoginManager: Already initialized with user, CurrentUser = {_currentUser?.UserName}");
+                return;
+            }
 
             // Load from HTTP Session (works during prerendering & refresh)
             // This is critical for Blazor Server - HTTP Session is available during
@@ -75,8 +80,13 @@ namespace EyeHospitalPOS.Helper
             try
             {
                 var httpContext = _httpContextAccessor.HttpContext;
+                Console.WriteLine($"LoginManager.InitializeAsync: HttpContext = {httpContext != null}, IsInitialized = {_initialized}, CurrentUser = {_currentUser?.UserName}");
+                
                 ISession? session = null;
-                try { session = httpContext?.Session; } catch (InvalidOperationException) { }
+                try { session = httpContext?.Session; } catch (InvalidOperationException ex) 
+                { 
+                    Console.WriteLine($"LoginManager: Session access failed: {ex.Message}");
+                }
 
                 if (session != null && httpContext != null)
                 {
@@ -85,6 +95,7 @@ namespace EyeHospitalPOS.Helper
                         // Check if response has started - if so, we cannot access session
                         if (httpContext.Response.HasStarted)
                         {
+                            Console.WriteLine("LoginManager: Response already started, cannot access session");
                             // Response has started, cannot access session
                             // Mark as initialized to prevent repeated attempts
                             _initialized = true;
@@ -98,6 +109,8 @@ namespace EyeHospitalPOS.Helper
                         if (session.IsAvailable)
                         {
                             var userJson = session.GetString("currentUser");
+                            Console.WriteLine($"LoginManager: Session available, userJson length = {userJson?.Length ?? 0}");
+                            
                             if (!string.IsNullOrEmpty(userJson))
                             {
                                 _currentUser = JsonSerializer.Deserialize<User>(userJson, new JsonSerializerOptions
@@ -105,28 +118,46 @@ namespace EyeHospitalPOS.Helper
                                     PropertyNameCaseInsensitive = true,
                                     ReferenceHandler = ReferenceHandler.IgnoreCycles
                                 });
+                                Console.WriteLine($"LoginManager: ✅ User loaded from session: {_currentUser?.UserName}, Role: {_currentUser?.Role?.Name}");
                             }
+                            else
+                            {
+                                Console.WriteLine("LoginManager: ⚠️ No user found in session (userJson is empty)");
+                            }
+                            
                             _authToken = session.GetString("authToken");
                             _refreshToken = session.GetString("refreshToken");
                         }
+                        else
+                        {
+                            Console.WriteLine("LoginManager: ⚠️ Session not available");
+                        }
                     }
-                    catch (InvalidOperationException)
+                    catch (InvalidOperationException ex)
                     {
+                        Console.WriteLine($"LoginManager: InvalidOperationException: {ex.Message}");
                         // Session cannot be accessed (response has started or session unavailable)
                         // Silently fail and mark as initialized to prevent repeated attempts
                     }
                     catch (Exception ex)
                     {
                         // Log other exceptions for debugging
-                        Console.WriteLine($"Error initializing LoginManager: {ex.Message}");
+                        Console.WriteLine($"❌ Error initializing LoginManager: {ex.Message}");
+                        Console.WriteLine($"Stack trace: {ex.StackTrace}");
                         // Silently fail and mark as initialized to prevent repeated attempts
                     }
                 }
+                else
+                {
+                    Console.WriteLine($"LoginManager: ⚠️ Session or HttpContext is null (Session={session != null}, HttpContext={httpContext != null})");
+                }
 
                 _initialized = true;
+                Console.WriteLine($"LoginManager: Initialization complete. IsLoggedIn = {IsLoggedIn}, User = {_currentUser?.UserName}");
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"❌ LoginManager.InitializeAsync outer exception: {ex.Message}");
             }
         }
             

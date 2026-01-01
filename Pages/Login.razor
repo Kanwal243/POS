@@ -126,6 +126,10 @@
             // Also attempt server-side save (might fail in SignalR but good practice if it works)
             await LoginManager.SaveUserAsync();
 
+            // CRITICAL: Wait for session to be committed before redirect
+            // This ensures the session is fully written before the page reload
+            await Task.Delay(100);
+
             // Notify AuthenticationStateProvider to update UI state
             // AuthProvider.NotifyUserAuthentication(user);
 
