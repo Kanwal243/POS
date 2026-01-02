@@ -1,0 +1,99 @@
+@page "/reports/sales-invoice"
+@using EyeHospitalPOS.Models
+@using EyeHospitalPOS.Helper
+@using EyeHospitalPOS.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject LoginManager LoginManager
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Sales Invoice Report - Eye Hospital POS</PageTitle>
+
+@if (LoginManager.CurrentUser == null)
+{
+    <div class="alert alert-warning m-4">Please login to access this page.</div>
+}
+else
+{
+    <div class="page-container p-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+             <div>
+                <h3 class="mb-1 fw-bold">Sales Invoice Reports</h3>
+                <p class="text-muted tiny mb-0">Generate and print sales invoices</p>
+             </div>
+             <DxButton Text="Back to Reports" 
+                       RenderStyle="ButtonRenderStyle.Secondary" 
+                       IconCssClass="fa-solid fa-arrow-left"
+                       Click="@(() => Navigation.NavigateTo("/reports"))" />
+        </div>
+
+        <div class="premium-card overflow-hidden">
+            <div class="card-body p-0">
+                <DxGrid Data="@invoices"
+                        ShowFilterRow="true"
+                        ShowSearchBox="true"
+                        PageSize="15"
+                        CssClass="enterprise-grid">
+                    <Columns>
+                        <DxGridDataColumn FieldName="InvoiceNumber" Caption="Invoice #" Width="150px">
+                             <CellDisplayTemplate>
+                                <span class="fw-bold text-primary">@context.Value</span>
+                            </CellDisplayTemplate>
+                        </DxGridDataColumn>
+                        <DxGridDataColumn FieldName="Customer.DisplayName" Caption="Customer" MinWidth="200" />
+                        <DxGridDataColumn FieldName="SaleDate" Caption="Date" Width="150px">
+                            <CellDisplayTemplate>
+                                <span class="text-muted small">@(((DateTime)context.Value).ToString("MMM dd, yyyy"))</span>
+                            </CellDisplayTemplate>
+                        </DxGridDataColumn>
+                        <DxGridDataColumn FieldName="TotalAmount" Caption="Amount" Width="150px" HeaderCssClass="text-end" CssClass="text-end">
+                            <CellDisplayTemplate>
+                                <span>@($"{((decimal)context.Value).ToString("N2")}")</span>
+                            </CellDisplayTemplate>
+                        </DxGridDataColumn>
+                        
+                        <DxGridDataColumn Caption="Actions" Width="150px" TextAlignment="GridTextAlignment.Center">
+                            <CellDisplayTemplate>
+                                @{
+                                    var sale = (Sale)context.DataItem;
+                                }
+                                <button class="btn btn-sm btn-outline-primary" @onclick="@(() => PrintInvoice(sale.Id))" title="Print Invoice">
+                                    <i class="fa-solid fa-print"></i> Print
+                                </button>
+                            </CellDisplayTemplate>
+                        </DxGridDataColumn>
+                    </Columns>
+                </DxGrid>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Sale> invoices = new List<Sale>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (LoginManager.CurrentUser == null)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        await LoadInvoices();
+    }
+
+    private async Task LoadInvoices()
+    {
+        invoices = await DbContext.Sales
+            .Include(s => s.Customer)
+            .OrderByDescending(s => s.SaleDate)
+            .ToListAsync();
+    }
+
+    private async Task PrintInvoice(int saleId)
+    {
+        await JSRuntime.InvokeVoidAsync("open", $"/api/reports/sales-invoice/{saleId}", "_blank");
+    }
+}

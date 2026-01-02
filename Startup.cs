@@ -114,6 +114,7 @@ namespace EyeHospitalPOS
             services.AddScoped<IPurchaseOrderService, PurchaseOrderService>();
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IBarcodeService, BarcodeService>();
+            services.AddScoped<ReportGenerator>();
             
             // Register Controllers manually for Blazor Injection
             services.AddScoped<EyeHospitalPOS.Controllers.LoginController>();
