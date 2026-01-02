@@ -34,6 +34,14 @@
                 </div>
             </div>
 
+            <!-- Error Message -->
+            @if (!data.Success && !string.IsNullOrEmpty(data.ErrorMessage))
+            {
+                <div class="alert alert-danger mb-4">
+                    <i class="fa-solid fa-triangle-exclamation me-2"></i> @data.ErrorMessage
+                </div>
+            }
+
             <!-- Metrics Cards -->
             <div class="row g-4 mb-4">
                 <!-- Customers Card -->
