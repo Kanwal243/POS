@@ -18,35 +18,28 @@
 }
 else
 {
-    <div class="page-container" style="padding: 1.5rem; background-color: #f8f9fa; min-height: 100vh;">
+    <div class="page-container p-4" style="min-height: 100vh;">
         <!-- Toolbar Header -->
-        <div class="premium-card mb-4 border-0 shadow-sm" style="background: white; border-radius: 12px;">
-            <div class="card-body p-3 d-flex justify-content-between align-items-center">
+        <div class="premium-card mb-4 border-0 shadow-sm rounded-3">
+            <div class="card-body p-3 d-flex justify-content-between align-items-center bg-body">
                 <div class="d-flex align-items-center gap-3">
                     <DxButton RenderStyle="ButtonRenderStyle.Light" 
                               IconCssClass="fa-solid fa-arrow-left text-muted" 
                               SizeMode="SizeMode.Medium"
                               Click="@(() => Navigation.NavigateTo("/invoices"))"
                               CssClass="rounded-circle" />
-                    <div>
-                        <h4 class="mb-0 fw-bold text-dark">New Invoice</h4>
-                        <p class="text-muted tiny mb-0">Create and process patient billing</p>
-                    </div>
+                   
                 </div>
                 <div class="d-flex gap-2">
-                    <DxButton RenderStyle="ButtonRenderStyle.Secondary" IconCssClass="fa-solid fa-file-circle-plus" Title="New" />
                     <DxButton Text="Save" 
                               RenderStyle="ButtonRenderStyle.Success" 
                               IconCssClass="fa-solid fa-floppy-disk" 
                               Click="SaveInvoice"
                               CssClass="px-3 fw-bold" />
-                    <DxButton RenderStyle="ButtonRenderStyle.Danger" IconCssClass="fa-solid fa-trash-can" Title="Delete" Enabled="@(currentSale.Id > 0)" />
                     <div class="vr mx-2"></div>
                     <DxButton RenderStyle="ButtonRenderStyle.Primary" IconCssClass="fa-solid fa-print" Title="Print" Enabled="@(currentSale.Id > 0)" />
-                    <DxButton RenderStyle="ButtonRenderStyle.Info" IconCssClass="fa-solid fa-file-pdf" Title="Export" Enabled="@(currentSale.Id > 0)" />
-                    <div class="vr mx-2"></div>
-                    <DxButton RenderStyle="ButtonRenderStyle.Secondary" IconCssClass="fa-solid fa-chevron-left" />
-                    <DxButton RenderStyle="ButtonRenderStyle.Secondary" IconCssClass="fa-solid fa-chevron-right" />
+@*                     <DxButton RenderStyle="ButtonRenderStyle.Info" IconCssClass="fa-solid fa-file-pdf" Title="Export" Enabled="@(currentSale.Id > 0)" />
+ *@                 
                 </div>
             </div>
         </div>
@@ -54,8 +47,8 @@ else
         <div class="row g-4">
             <!-- Header Information -->
             <div class="col-12">
-                <div class="premium-card border-0 shadow-sm" style="background: white; border-radius: 12px; overflow: hidden;">
-                    <div class="card-header py-2 px-3 border-0" style="background: #eef2f7;">
+                <div class="premium-card border-0 shadow-sm rounded-3 overflow-hidden bg-body">
+                    <div class="card-header py-2 px-3 border-0 bg-body-tertiary">
                         <span class="fw-bold tiny text-muted text-uppercase tracking-wider">General Information</span>
                     </div>
                     <div class="card-body p-4">
@@ -63,7 +56,7 @@ else
                             <DxFormLayoutGroup ColSpanLg="12" Decoration="FormLayoutGroupDecoration.None">
                                 <!-- Row 1 -->
                                 <DxFormLayoutItem Caption="Inv No:" ColSpanLg="6" ColSpanMd="12">
-                                    <DxTextBox Text="@currentSale.InvoiceNumber" ReadOnly="true" CssClass="bg-light fw-bold" />
+                                    <DxTextBox Text="@currentSale.InvoiceNumber" ReadOnly="true" CssClass="form-control-plaintext fw-bold" />
                                 </DxFormLayoutItem>
                                 <DxFormLayoutItem Caption="Total Discount:" ColSpanLg="6" ColSpanMd="12">
                                     <DxSpinEdit Value="@currentSale.DiscountAmount"
@@ -97,7 +90,7 @@ else
                                 <!-- Row 4 -->
                                 <DxFormLayoutItem Caption="Total Amount:" ColSpanLg="6" ColSpanMd="12">
                                     <DxSpinEdit Value="@currentSale.SubTotal" ReadOnly="true" 
-                                                DisplayFormat="@($"{currencySymbol} #,0.00")" CssClass="bg-light fw-bold" />
+                                                DisplayFormat="@($"{currencySymbol} #,0.00")" CssClass="form-control-plaintext fw-bold" />
                                 </DxFormLayoutItem>
                                 <DxFormLayoutItem Caption="Remarks:" ColSpanLg="6" ColSpanMd="12">
                                     <DxTextBox @bind-Text="@currentSale.Remarks" />
@@ -106,7 +99,7 @@ else
                                 <!-- Row 5 -->
                                 <DxFormLayoutItem Caption="Total Payable:" ColSpanLg="6" ColSpanMd="12">
                                     <DxSpinEdit Value="@currentSale.TotalAmount" ReadOnly="true" 
-                                                DisplayFormat="@($"{currencySymbol} #,0.00")" CssClass="bg-light text-primary fw-bold fs-5" />
+                                                DisplayFormat="@($"{currencySymbol} #,0.00")" CssClass="form-control-plaintext text-primary fw-bold fs-5" />
                                 </DxFormLayoutItem>
                                 <DxFormLayoutItem Caption="Transaction Date:" ColSpanLg="6" ColSpanMd="12">
                                     <DxDateEdit Date="@currentSale.SaleDate" 
@@ -122,18 +115,13 @@ else
 
             <!-- Items Table -->
             <div class="col-12">
-                <div class="premium-card border-0 shadow-sm" style="background: white; border-radius: 12px; overflow: hidden;">
-                    <div class="card-header py-3 px-4 border-0 d-flex justify-content-between align-items-center" style="background: #eef2f7;">
+                <div class="premium-card border-0 shadow-sm rounded-3 overflow-hidden bg-body">
+                    <div class="card-header py-3 px-4 border-0 d-flex justify-content-between align-items-center bg-body-tertiary">
                         <div class="d-flex align-items-center gap-2">
                             <i class="fa-solid fa-list-check text-primary"></i>
-                            <span class="fw-bold text-dark text-uppercase tracking-wider">Issued Items</span>
+                            <span class="fw-bold text-body text-uppercase tracking-wider">Issued Items</span>
                         </div>
-                        <DxButton Text="Add New Item" 
-                                  RenderStyle="ButtonRenderStyle.Primary" 
-                                  SizeMode="SizeMode.Small" 
-                                  IconCssClass="fa-solid fa-plus-circle" 
-                                  Click="@(() => Grid.StartEditNewRowAsync())"
-                                  CssClass="fw-semibold px-3" />
+
                     </div>
                     <div class="card-body p-0">
                         <DxGrid @ref="Grid"
@@ -168,6 +156,14 @@ else
                                 </DxGridDataColumn>
                                 <DxGridDataColumn FieldName="Description" Caption="Description" MinWidth="150" />
                                 <DxGridDataColumn FieldName="Quantity" Caption="Qty" Width="100px" TextAlignment="GridTextAlignment.Center">
+                                     <HeaderCaptionTemplate>
+                                         <div class="d-flex justify-content-center align-items-center w-100" 
+                                              style="cursor: pointer;" 
+                                              @onclick="AddNewItem"
+                                              title="Add New Item">
+                                             <i class="fa-solid fa-circle-plus text-dark" style="font-size: 1.5rem;"></i>
+                                         </div>
+                                     </HeaderCaptionTemplate>
                                      <CellEditTemplate>
                                          <DxSpinEdit Value="@(((SaleItem)context.EditModel).Quantity)"
                                                      ValueChanged="@((int val) => { ((SaleItem)context.EditModel).Quantity = val; RecalculateItem((SaleItem)context.EditModel); })" 
@@ -209,7 +205,24 @@ else
                                         <span class="fw-bold text-primary">@($"{currencySymbol} {payable.ToString("N2")}")</span>
                                     </CellDisplayTemplate>
                                 </DxGridDataColumn>
-                                <DxGridCommandColumn Width="120px" NewButtonVisible="false" />
+                                <DxGridDataColumn Width="100px" Caption="Actions">
+                                    <CellDisplayTemplate>
+                                        <div class="d-flex justify-content-center gap-2">
+                                            <DxButton RenderStyle="ButtonRenderStyle.Secondary" 
+                                                      IconCssClass="fa-solid fa-edit text-primary" 
+                                                      SizeMode="SizeMode.Small"
+                                                      RenderStyleMode="ButtonRenderStyleMode.Outline"
+                                                      Click="@(() => StartEditItem((SaleItem)context.DataItem))"
+                                                      Title="Edit" />
+                                            <DxButton RenderStyle="ButtonRenderStyle.Danger" 
+                                                      IconCssClass="fa-solid fa-trash text-white" 
+                                                      SizeMode="SizeMode.Small"
+                                                      RenderStyleMode="ButtonRenderStyleMode.Outline"
+                                                      Click="@(() => DeleteItem((SaleItem)context.DataItem))"
+                                                      Title="Delete" />
+                                        </div>
+                                    </CellDisplayTemplate>
+                                </DxGridDataColumn>
                             </Columns>
                         </DxGrid>
                     </div>
@@ -223,7 +236,7 @@ else
     private Sale currentSale = new Sale { SaleDate = DateTime.Now, SaleItems = new List<SaleItem>() };
     private List<Customer> customers = new List<Customer>();
     private List<Product> products = new List<Product>();
-    private IGrid Grid { get; set; }
+    private DxGrid Grid { get; set; }
     private string currencySymbol = "$";
 
     protected override async Task OnInitializedAsync()
@@ -319,6 +332,31 @@ else
         currentSale.SaleItems.Remove((SaleItem)e.DataItem);
         UpdateTotals();
         await InvokeAsync(StateHasChanged);
+    }
+
+    private void StartEditItem(SaleItem item)
+    {
+        // For now, we'll use the grid's built-in editing functionality
+        // The grid should handle row editing with EditMode="GridEditMode.EditRow"
+    }
+    
+    private void DeleteItem(SaleItem item)
+    {
+        currentSale.SaleItems.Remove(item);
+        UpdateTotals();
+        StateHasChanged();
+    }
+
+    private void AddNewItem()
+    {
+        var newItem = new SaleItem 
+        { 
+            Quantity = 1, 
+            UnitPrice = 0, 
+            Discount = 0 
+        };
+        currentSale.SaleItems.Add(newItem);
+        StateHasChanged();
     }
 
     private async Task SaveInvoice()

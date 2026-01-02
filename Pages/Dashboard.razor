@@ -183,7 +183,7 @@
             </div>
 
             <!-- Tables Section -->
-            <div class="row g-4">
+@*             <div class="row g-4">
                 <!-- Recent Sales Grid -->
                 <div class="col-lg-12">
                     <div class="premium-card">
@@ -212,6 +212,7 @@
                     </div>
                 </div>
             </div>
+ *@       
         </div>
     </Authorized>
     <NotAuthorized>
@@ -242,7 +243,7 @@
     private async Task LoadOrganizationSettings()
     {
         var org = await DbContext.Organizations.FirstOrDefaultAsync();
-        currencySymbol = CurrencyHelper.GetCurrencySymbol(org);
+        currencySymbol = "Rs. "; // Override to use Rupees symbol instead of organization's default
     }
 
     private async Task LoadDashboardData()

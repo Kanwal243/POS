@@ -14,7 +14,6 @@
 @inject IPurchaseOrderService PurchaseOrderService
 @inject IJSRuntime JSRuntime
 
-
 <PageTitle>@(Id == 0 ? "New Receiving" : $"IR-{CurrentIR.IRNumber}") - Eye Hospital POS</PageTitle>
 
 @if (LoginManager.CurrentUser == null)
@@ -23,7 +22,7 @@
 }
 else
 {
-    <div class="page-container" style="padding-bottom: 80px;"> <!-- Padding for sticky footer -->
+    <div class="page-container" style="padding: 0 2rem 100px 2rem;"> <!-- Padding for sticky footer -->
         
         <!-- Sticky Toolbar -->
         <div class="sticky-top d-flex justify-content-between align-items-center">
@@ -226,29 +225,34 @@ else
 
                         @if (CurrentIR.Status == InventoryStatus.Draft)
                         {
-                            <DxGridDataColumn Width="140px">
+                            <DxGridDataColumn Width="130px" Caption="Actions">
                                 <HeaderCaptionTemplate>
-                                    <div class="d-flex justify-content-center align-items-center w-100 gap-2">
-                                        <DxButton RenderStyle="ButtonRenderStyle.Secondary" 
+                                    <div class="d-flex justify-content-center align-items-center w-100" 
+                                         style="cursor: pointer;" 
+                                         @onclick="@(() => ShowProductModal = true)"
+                                         title="Add New Item">
+                                        <i class="fa-solid fa-circle-plus text-dark" style="font-size: 1.5rem;"></i>
+                                    </div>
+                                        @*   <DxButton RenderStyle="ButtonRenderStyle.Secondary" 
                                                   IconCssClass="fa-solid fa-plus" 
                                                   SizeMode="SizeMode.Small"
                                                   Click="@(() => ShowProductModal = true)"
-                                                  title="Add New Item manually" />
-                                        
-                                        <DxButton RenderStyle="ButtonRenderStyle.Secondary" 
+                                                  title="Add New Item manually" /> *@
+                                                                    
+                                      @*   <DxButton RenderStyle="ButtonRenderStyle.Secondary" 
                                                   IconCssClass="fa-solid fa-qrcode" 
                                                   SizeMode="SizeMode.Small"
                                                   Click="@(() => ShowScannerModal = true)"
-                                                  title="Scan Barcode" />
-                                    </div>
+                                                  title="Scan Barcode" /> *@
+                                    
                                 </HeaderCaptionTemplate>
                                 <CellDisplayTemplate>
                                     <div class="d-flex gap-2 justify-content-center">
-                                        <DxButton HtmlElementId="@($"edit-btn-{((InventoryReceivingItem)context.DataItem).ProductId}")"
+                                       @*  <DxButton HtmlElementId="@($"edit-btn-{((InventoryReceivingItem)context.DataItem).ProductId}")"
                                                   Text="+" 
                                                   RenderStyle="ButtonRenderStyle.Primary" 
                                                   SizeMode="SizeMode.Small"
-                                                  Click="@(() => OpenModifyModalForItem((InventoryReceivingItem)context.DataItem))" />
+                                                  Click="@(() => OpenModifyModalForItem((InventoryReceivingItem)context.DataItem))" /> *@
                                         <DxButton HtmlElementId="@($"del-btn-{((InventoryReceivingItem)context.DataItem).ProductId}")"
                                                   RenderStyle="ButtonRenderStyle.Danger" 
                                                   IconCssClass="fa-solid fa-trash"
@@ -324,6 +328,13 @@ else
     </div>
 }
 
+<style>
+    .premium-grid {
+        border-radius: 0 0 12px 12px;
+        overflow: hidden;
+    }
+</style>
+
 @code {
     [Parameter] public int Id { get; set; }
     [SupplyParameterFromQuery] public int? poId { get; set; }
@@ -331,16 +342,13 @@ else
     private EyeHospitalPOS.Models.InventoryReceiving CurrentIR = new() { InventoryReceivingItems = new List<InventoryReceivingItem>() };
     private List<Supplier> Suppliers = new();
     private List<Product> Products = new();
+    
     private bool ShowProductModal = false;
     private bool ShowScannerModal = false;
     private string currencySymbol = "$";
-    
-    // Helper for PurchaseOrderId textbox since it's int?
-    private string ConvertPurchaseOrderId
-    {
-        get => CurrentIR.PurchaseOrderId?.ToString() ?? "";
-        set => CurrentIR.PurchaseOrderId = int.TryParse(value, out int result) ? result : null;
-    }
+    private IGrid ItemsGrid;
+
+    private int TotalQuantity => CurrentIR.InventoryReceivingItems.Sum(i => i.Quantity);
 
     protected override async Task OnInitializedAsync()
     {
@@ -409,19 +417,20 @@ else
         currencySymbol = CurrencyHelper.GetCurrencySymbol(org);
     }
 
+    // Helper for PurchaseOrderId textbox since it's int?
+    private string ConvertPurchaseOrderId
+    {
+        get => CurrentIR.PurchaseOrderId?.ToString() ?? "";
+        set => CurrentIR.PurchaseOrderId = int.TryParse(value, out int result) ? result : null;
+    }
+
     private void CalculateItemTotal(object editModel)
     {
-        // Reflection to calculate totals dynamically during edit
-        try {
-            var qtyProp = editModel.GetType().GetProperty("Quantity");
-            var costProp = editModel.GetType().GetProperty("CostPrice");
-            var subProp = editModel.GetType().GetProperty("Subtotal");
-
-            int qty = (int)qtyProp.GetValue(editModel);
-            decimal cost = (decimal)costProp.GetValue(editModel);
-            
-            subProp.SetValue(editModel, qty * cost);
-        } catch {}
+        // Direct cast to InventoryReceivingItem for better performance and type safety
+        if (editModel is InventoryReceivingItem item)
+        {
+            item.Subtotal = item.Quantity * item.CostPrice;
+        }
     }
 
     private void RecalculateTotal()
@@ -437,7 +446,11 @@ else
         var existingItem = e.DataItem as InventoryReceivingItem;
 
         // Validation
-        if (item.ProductId == 0 || item.Quantity <= 0) return;
+        if (item.ProductId == 0 || item.Quantity <= 0)
+        {
+            // Optionally show a validation message
+            return;
+        }
 
         // Calculate Subtotal explicitly
         item.Subtotal = item.Quantity * item.CostPrice;
@@ -466,8 +479,11 @@ else
     private async Task OnItemDeleting(GridDataItemDeletingEventArgs e)
     {
         var item = (InventoryReceivingItem)e.DataItem;
-        CurrentIR.InventoryReceivingItems.Remove(item);
-        RecalculateTotal();
+        if (item != null)
+        {
+            CurrentIR.InventoryReceivingItems.Remove(item);
+            RecalculateTotal();
+        }
         await InvokeAsync(StateHasChanged);
     }
 
@@ -480,15 +496,30 @@ else
             return;
         }
 
-        if (CurrentIR.Id == 0)
+        try
         {
-            CurrentIR = await InventoryService.CreateInventoryReceivingAsync(CurrentIR);
+            if (CurrentIR.Id == 0)
+            {
+                CurrentIR = await InventoryService.CreateInventoryReceivingAsync(CurrentIR);
+            }
+            else
+            {
+                CurrentIR = await InventoryService.UpdateInventoryReceivingAsync(CurrentIR);
+            }
+            
+            // Refresh the current IR to ensure all properties are updated
+            var refreshedIR = await InventoryService.GetInventoryReceivingByIdAsync(CurrentIR.Id);
+            if (refreshedIR != null)
+            {
+                CurrentIR = refreshedIR;
+            }
+            
+            Navigation.NavigateTo($"/inventory-receiving/{CurrentIR.Id}");
         }
-        else
+        catch (Exception ex)
         {
-            CurrentIR = await InventoryService.UpdateInventoryReceivingAsync(CurrentIR);
+            await JSRuntime.InvokeVoidAsync("alert", $"Error saving draft: {ex.Message}");
         }
-        Navigation.NavigateTo($"/inventory-receiving/{CurrentIR.Id}");
     }
 
     private async Task ActivateIR()
@@ -502,7 +533,16 @@ else
         try
         {
             CurrentIR = await InventoryService.ActivateInventoryReceivingAsync(CurrentIR.Id, LoginManager.CurrentUser.Id);
+            
+            // Refresh the current IR to ensure all properties are updated
+            var refreshedIR = await InventoryService.GetInventoryReceivingByIdAsync(CurrentIR.Id);
+            if (refreshedIR != null)
+            {
+                CurrentIR = refreshedIR;
+            }
+            
             await JSRuntime.InvokeVoidAsync("alert", "IR Activated Successfully!");
+            StateHasChanged();
         }
         catch (Exception ex)
         {
@@ -518,7 +558,16 @@ else
         try
         {
             CurrentIR = await InventoryService.DeactivateInventoryReceivingAsync(CurrentIR.Id, LoginManager.CurrentUser.Id);
+            
+            // Refresh the current IR to ensure all properties are updated
+            var refreshedIR = await InventoryService.GetInventoryReceivingByIdAsync(CurrentIR.Id);
+            if (refreshedIR != null)
+            {
+                CurrentIR = refreshedIR;
+            }
+            
             await JSRuntime.InvokeVoidAsync("alert", "IR Deactivated. Stock reversed.");
+            StateHasChanged();
         }
         catch (Exception ex)
         {
@@ -534,8 +583,16 @@ else
         try
         {
             await InventoryService.CancelInventoryReceivingAsync(CurrentIR.Id, LoginManager.CurrentUser.Id);
-            CurrentIR.Status = InventoryStatus.Cancelled;
+            
+            // Refresh the current IR to ensure all properties is updated
+            var refreshedIR = await InventoryService.GetInventoryReceivingByIdAsync(CurrentIR.Id);
+            if (refreshedIR != null)
+            {
+                CurrentIR = refreshedIR;
+            }
+            
             await JSRuntime.InvokeVoidAsync("alert", "IR Cancelled.");
+            StateHasChanged();
         }
         catch (Exception ex)
         {
@@ -545,6 +602,8 @@ else
 
     private void SelectProduct(Product product)
     {
+        if (product == null) return; // Validate product exists
+        
         if (currentItemToModify != null)
         {
             // We're modifying an existing item
@@ -592,21 +651,9 @@ else
         ShowProductModal = true;
     }
 
-
-
-    private string GetStatusBadgeClass(InventoryStatus status)
+    private void HandleProductsScanned(List<Product> scannedProducts)
     {
-        return status switch
-        {
-            InventoryStatus.Active => "bg-success text-white",
-            InventoryStatus.Cancelled => "bg-danger text-white",
-            _ => "bg-secondary text-white"
-        };
-    }
-
- private void HandleProductsScanned(List<Product> scannedProducts)
-    {
-        if (scannedProducts == null) return;
+        if (scannedProducts == null || !scannedProducts.Any()) return;
 
         foreach (var product in scannedProducts)
         {
@@ -616,4 +663,11 @@ else
         ShowScannerModal = false;
         StateHasChanged();
     }
+
+    private string GetStatusBadgeClass(InventoryStatus status) => status switch
+    {
+        InventoryStatus.Active => "bg-success text-white",
+        InventoryStatus.Cancelled => "bg-danger text-white",
+        _ => "bg-secondary text-white"
+    };
 }

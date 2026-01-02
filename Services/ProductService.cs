@@ -113,7 +113,6 @@ namespace EyeHospitalPOS.Services
             {
                 product.StockQuantity += quantity;
                 await _context.SaveChangesAsync();
-                await _context.SaveChangesAsync();
             }
         }
 

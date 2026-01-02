@@ -3,8 +3,7 @@
 @using EyeHospitalPOS.Services
 @using EyeHospitalPOS.Interfaces
 @inject IJSRuntime JS
-@inject HttpClient Http
-@using System.Net.Http.Json
+@inject IBarcodeService BarcodeService
 @using Microsoft.EntityFrameworkCore
 @implements IAsyncDisposable
 
@@ -236,22 +235,24 @@
             // To make this work robustly in Server-side without hardcoding localhost, 
             // we often inject NavigationManager to get BaseUri.
             
-            var response = await Http.PostAsJsonAsync("api/products/decode-barcode-image", 
-                new BarcodeImageRequest { ImageData = imageData });
-
-            if (response.IsSuccessStatusCode)
+            // Decode the barcode from the image using the BarcodeService
+            var decodeResult = BarcodeService.DecodeFromBase64(imageData);
+            
+            if (decodeResult?.Success == true && !string.IsNullOrEmpty(decodeResult.Barcode))
             {
-                var result = await response.Content.ReadFromJsonAsync<BarcodeDecodeResponse>();
-                
-                if (result?.Success == true && !string.IsNullOrEmpty(result.Barcode))
+                // If barcode was successfully decoded, try to find the associated product
+                Product? product = null;
+                if (!string.IsNullOrEmpty(decodeResult.Barcode))
                 {
-                    // Only process if we haven't scanned this barcode recently
-                    if (result.Barcode != LastScannedBarcode || 
-                        (now - _lastScanTime).TotalMilliseconds >= MIN_SCAN_INTERVAL_MS)
-                    {
-                        _lastScanTime = now;
-                        await OnBarcodeDetected(result.Barcode, result.Product);
-                    }
+                    product = await DbContext.Products.FirstOrDefaultAsync(p => p.Barcode == decodeResult.Barcode && p.IsActive);
+                }
+                
+                // Only process if we haven't scanned this barcode recently
+                if (decodeResult.Barcode != LastScannedBarcode || 
+                    (now - _lastScanTime).TotalMilliseconds >= MIN_SCAN_INTERVAL_MS)
+                {
+                    _lastScanTime = now;
+                    await OnBarcodeDetected(decodeResult.Barcode, product);
                 }
             }
         }

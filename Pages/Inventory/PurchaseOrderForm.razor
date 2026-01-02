@@ -163,6 +163,11 @@ else
                         EditorRenderMode="GridEditorRenderMode.Integrated"
                         EditModelSaving="OnItemSaving"
                         DataItemDeleting="OnItemDeleting"
+                        Height="400px"
+                        AllowColumnReordering="true"
+                        ShowColumnLines="true"
+                        ShowRowLines="true"
+                        ShowBorders="true"
                         CssClass="enterprise-grid">
                     <Columns>
                         <DxGridDataColumn Caption="Product" FieldName="ProductId" MinWidth="250">
@@ -234,11 +239,11 @@ else
                                 </HeaderCaptionTemplate>
                                 <CellDisplayTemplate>
                                     <div class="d-flex gap-2 justify-content-center">
-                                        <DxButton HtmlElementId="@($"edit-btn-{((PurchaseItem)context.DataItem).ProductId}")"
+                                        @* <DxButton HtmlElementId="@($"edit-btn-{((PurchaseItem)context.DataItem).ProductId}")"
                                                   Text="+" 
                                                   RenderStyle="ButtonRenderStyle.Primary" 
                                                   SizeMode="SizeMode.Small"
-                                                  Click="@(() => OpenModifyModalForItem((PurchaseItem)context.DataItem))" />
+                                                  Click="@(() => OpenModifyModalForItem((PurchaseItem)context.DataItem))" /> *@
                                         <DxButton HtmlElementId="@($"del-btn-{((PurchaseItem)context.DataItem).ProductId}")"
                                                   RenderStyle="ButtonRenderStyle.Danger" 
                                                   IconCssClass="fa-solid fa-trash"

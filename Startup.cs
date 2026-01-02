@@ -82,6 +82,11 @@ namespace EyeHospitalPOS
             services.AddAuthorization();
 
             // ============================
+            // HTTP CLIENT
+            // ============================
+            services.AddHttpClient();
+
+            // ============================
             // BLAZOR AUTH STATE
             // ============================
             // services.AddScoped<CustomAuthenticationStateProvider>();

@@ -1,0 +1,286 @@
+@page "/products/form"
+@using EyeHospitalPOS.Models
+@using EyeHospitalPOS.Data
+@using EyeHospitalPOS.Interfaces
+@using EyeHospitalPOS.Helper
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext DbContext
+@inject IProductService ProductService
+@inject NavigationManager Navigation
+@inject LoginManager LoginManager
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Product Form - Eye Hospital POS</PageTitle>
+
+@if (LoginManager.CurrentUser == null)
+{
+    <div class="alert alert-warning m-4">Please login to access this page.</div>
+}
+else
+{
+    <div class="page-container p-4" style="min-height: 100vh;">
+        <!-- Toolbar Header -->
+        <div class="premium-card mb-4 border-0 shadow-sm rounded-3">
+            <div class="card-body p-3 d-flex justify-content-between align-items-center bg-body">
+                <div class="d-flex align-items-center gap-3">
+                    <DxButton RenderStyle="ButtonRenderStyle.Light" 
+                              IconCssClass="fa-solid fa-arrow-left text-muted" 
+                              SizeMode="SizeMode.Medium"
+                              Click="@(() => Navigation.NavigateTo("/products"))"
+                              CssClass="rounded-circle" />
+                </div>
+                <div class="d-flex gap-2">
+                    <DxButton Text="New" 
+                              RenderStyle="ButtonRenderStyle.Primary" 
+                              IconCssClass="fa-solid fa-plus" 
+                              Click="NewProduct"
+                              CssClass="px-3 fw-bold" />
+                    <DxButton Text="Save" 
+                              RenderStyle="ButtonRenderStyle.Success" 
+                              IconCssClass="fa-solid fa-floppy-disk" 
+                              Click="SaveProduct"
+                              CssClass="px-3 fw-bold" />
+                    <DxButton Text="Delete" 
+                              RenderStyle="ButtonRenderStyle.Danger" 
+                              IconCssClass="fa-solid fa-trash" 
+                              Click="DeleteProduct"
+                              CssClass="px-3 fw-bold" />
+                    <div class="vr mx-2"></div>
+                    <DxButton Text="Validate" 
+                              RenderStyle="ButtonRenderStyle.Info" 
+                              IconCssClass="fa-solid fa-check" 
+                              Click="ValidateProduct"
+                              CssClass="px-3 fw-bold" />
+                    <DxButton Text="Refresh" 
+                              RenderStyle="ButtonRenderStyle.Secondary" 
+                              IconCssClass="fa-solid fa-sync" 
+                              Click="RefreshForm"
+                              CssClass="px-3 fw-bold" />
+                    <DxButton Text="Close" 
+                              RenderStyle="ButtonRenderStyle.Secondary" 
+                              IconCssClass="fa-solid fa-times" 
+                              Click="@(() => Navigation.NavigateTo("/products"))"
+                              CssClass="px-3 fw-bold" />
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <!-- Product Information -->
+            <div class="col-12">
+                <div class="premium-card border-0 shadow-sm rounded-3 overflow-hidden bg-body">
+                    <div class="card-header py-2 px-3 border-0 bg-body-tertiary">
+                        <span class="fw-bold tiny text-muted text-uppercase tracking-wider">Product Information</span>
+                    </div>
+                    <div class="card-body p-4">
+                        <DxFormLayout ItemSpacing="20px">
+                            <DxFormLayoutGroup ColSpanLg="12" Decoration="FormLayoutGroupDecoration.None">
+                                <!-- Row 1 -->
+                                <DxFormLayoutItem Caption="Product Name:" ColSpanLg="6" ColSpanMd="12">
+                                    <DxTextBox @bind-Text="@currentProduct.Name" NullText="Enter product name..." />
+                                </DxFormLayoutItem>
+                                <DxFormLayoutItem Caption="Product Category:" ColSpanLg="6" ColSpanMd="12">
+                                    <DxComboBox Data="@productCategories" 
+                                                @bind-Value="@currentProduct.CategoryId" 
+                                                ValueFieldName="Id" 
+                                                TextFieldName="Name"
+                                                FilteringMode="DataGridFilteringMode.Contains"
+                                                NullText="Select a category..."
+                                                SelectedItemChanged="@((ProductCategory category) => { if(category != null) { currentProduct.CategoryId = category.Id; OnCategoryChanged(); }})" />
+                                </DxFormLayoutItem>
+
+                                <!-- Row 2 -->
+                                <DxFormLayoutItem Caption="Barcode:" ColSpanLg="6" ColSpanMd="12">
+                                    <DxTextBox @bind-Text="@currentProduct.Barcode" NullText="Enter barcode..." />
+                                </DxFormLayoutItem>
+                                <DxFormLayoutItem Caption="Category Code:" ColSpanLg="6" ColSpanMd="12">
+                                    <DxTextBox Text="@selectedCategoryCode" ReadOnly="true" CssClass="form-control-plaintext" />
+                                </DxFormLayoutItem>
+
+                                <!-- Row 3 -->
+                                <DxFormLayoutItem Caption="Cost Price:" ColSpanLg="6" ColSpanMd="12">
+                                    <DxSpinEdit @bind-Value="@currentProduct.CostPrice" 
+                                                DisplayFormat="@($"{currencySymbol} #,0.00")" 
+                                                MinValue="0" />
+                                </DxFormLayoutItem>
+                                <DxFormLayoutItem Caption="Sale Price:" ColSpanLg="6" ColSpanMd="12">
+                                    <DxSpinEdit @bind-Value="@currentProduct.SalePrice" 
+                                                DisplayFormat="@($"{currencySymbol} #,0.00")" 
+                                                MinValue="0" />
+                                </DxFormLayoutItem>
+
+                                <!-- Row 4 -->
+                                <DxFormLayoutItem Caption="Reorder Level:" ColSpanLg="6" ColSpanMd="12">
+                                    <DxSpinEdit @bind-Value="@currentProduct.ReorderLevel" 
+                                                MinValue="0" />
+                                </DxFormLayoutItem>
+                                <DxFormLayoutItem Caption="Supplier:" ColSpanLg="6" ColSpanMd="12">
+                                    <DxComboBox Data="@suppliers" 
+                                                @bind-Value="@currentProduct.SupplierId" 
+                                                ValueFieldName="Id" 
+                                                TextFieldName="Name"
+                                                FilteringMode="DataGridFilteringMode.Contains"
+                                                NullText="Select a supplier..." />
+                                </DxFormLayoutItem>
+
+                                <!-- Row 5 -->
+                                <DxFormLayoutItem Caption="Stock Quantity:" ColSpanLg="6" ColSpanMd="12">
+                                    <DxSpinEdit @bind-Value="@currentProduct.StockQuantity" 
+                                                MinValue="0" />
+                                </DxFormLayoutItem>
+                                <DxFormLayoutItem Caption="Status:" ColSpanLg="3" ColSpanMd="6">
+                                    <DxCheckBox @bind-Checked="@currentProduct.IsActive" Text="Active" />
+                                </DxFormLayoutItem>
+                                <DxFormLayoutItem Caption="Product Type:" ColSpanLg="3" ColSpanMd="6">
+                                    <DxComboBox Data="@productTypes" 
+                                                @bind-Value="@currentProduct.TypeId" 
+                                                ValueFieldName="Id" 
+                                                TextFieldName="Name"
+                                                FilteringMode="DataGridFilteringMode.Contains"
+                                                NullText="Select type..." />
+                                </DxFormLayoutItem>
+                            </DxFormLayoutGroup>
+                        </DxFormLayout>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private Product currentProduct = new Product { IsActive = true, ReorderLevel = 0, CostPrice = 0, SalePrice = 0, StockQuantity = 0 };
+    private List<ProductCategory> productCategories = new List<ProductCategory>();
+    private List<ProductType> productTypes = new List<ProductType>();
+    private List<Supplier> suppliers = new List<Supplier>();
+    private string currencySymbol = "$";
+    private string selectedCategoryCode = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (LoginManager.CurrentUser == null) return;
+
+        productCategories = await DbContext.ProductCategories.ToListAsync();
+        productTypes = await DbContext.ProductTypes.ToListAsync();
+        suppliers = await DbContext.Suppliers.ToListAsync();
+        
+        var org = await DbContext.Organizations.FirstOrDefaultAsync();
+        currencySymbol = CurrencyHelper.GetCurrencySymbol(org);
+    }
+
+    private void NewProduct()
+    {
+        currentProduct = new Product { IsActive = true, ReorderLevel = 0, CostPrice = 0, SalePrice = 0 };
+        selectedCategoryCode = "";
+        StateHasChanged();
+    }
+
+    private async Task SaveProduct()
+    {
+        try
+        {
+            if (currentProduct.Id == 0)
+            {
+                // New product
+                DbContext.Products.Add(currentProduct);
+            }
+            else
+            {
+                // Update existing product
+                DbContext.Products.Update(currentProduct);
+            }
+            
+            await DbContext.SaveChangesAsync();
+            await JSRuntime.InvokeVoidAsync("alert", "Success: Product saved successfully!");
+            Navigation.NavigateTo("/products");
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"System Error: {ex.Message}");
+        }
+    }
+
+    private async Task DeleteProduct()
+    {
+        if (currentProduct.Id == 0)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Warning: Cannot delete a new product.");
+            return;
+        }
+
+        var confirm = await JSRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to delete this product?");
+        if (confirm)
+        {
+            try
+            {
+                DbContext.Products.Remove(currentProduct);
+                await DbContext.SaveChangesAsync();
+                await JSRuntime.InvokeVoidAsync("alert", "Success: Product deleted successfully!");
+                Navigation.NavigateTo("/products");
+            }
+            catch (Exception ex)
+            {
+                await JSRuntime.InvokeVoidAsync("alert", $"System Error: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task ValidateProduct()
+    {
+        var errors = new List<string>();
+        
+        if (string.IsNullOrWhiteSpace(currentProduct.Name))
+            errors.Add("Product Name is required.");
+            
+        if (string.IsNullOrWhiteSpace(currentProduct.Barcode))
+            errors.Add("Barcode is required.");
+            
+        if (currentProduct.CategoryId == 0)
+            errors.Add("Product Category is required.");
+            
+        if (currentProduct.SupplierId == 0)
+            errors.Add("Supplier is required.");
+            
+        if (currentProduct.TypeId == 0)
+            errors.Add("Product Type is required.");
+            
+        if (currentProduct.CostPrice < 0)
+            errors.Add("Cost Price cannot be negative.");
+            
+        if (currentProduct.SalePrice < 0)
+            errors.Add("Sale Price cannot be negative.");
+            
+        if (currentProduct.SalePrice < currentProduct.CostPrice)
+            errors.Add("Sale Price should not be less than Cost Price.");
+
+        if (errors.Any())
+        {
+            var errorText = string.Join("\n", errors);
+            await JSRuntime.InvokeVoidAsync("alert", $"Validation Error(s):\n{errorText}");
+        }
+        else
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Validation Successful: All fields are valid.");
+        }
+    }
+
+    private async Task RefreshForm()
+    {
+        if (currentProduct.Id != 0)
+        {
+            var existingProduct = await DbContext.Products.FindAsync(currentProduct.Id);
+            if (existingProduct != null)
+            {
+                currentProduct = existingProduct;
+            }
+        }
+        StateHasChanged();
+    }
+
+    private void OnCategoryChanged()
+    {
+        var selectedCategory = productCategories.FirstOrDefault(c => c.Id == currentProduct.CategoryId);
+        selectedCategoryCode = selectedCategory?.Code ?? "";
+        StateHasChanged();
+    }
+}
