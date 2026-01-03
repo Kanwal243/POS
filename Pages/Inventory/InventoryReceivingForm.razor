@@ -184,7 +184,7 @@ else
                             <CellEditTemplate>
                                 <DxComboBox Data="@Products"
                                             Value="@(((InventoryReceivingItem)context.EditModel).ProductId)"
-                                            ValueChanged="@((int newValue) => { ((InventoryReceivingItem)context.EditModel).ProductId = newValue; })"
+                                            ValueChanged="@((int newValue) => OnProductChanged((InventoryReceivingItem)context.EditModel, newValue))"
                                             ValueFieldName="Id"
                                             TextFieldName="Name"
                                             FilteringMode="DataGridFilteringMode.Contains"
@@ -239,11 +239,11 @@ else
                                                   Click="@(() => ShowProductModal = true)"
                                                   title="Add New Item manually" /> *@
                                                                     
-                                      @*   <DxButton RenderStyle="ButtonRenderStyle.Secondary" 
-                                                  IconCssClass="fa-solid fa-qrcode" 
+                                        <DxButton RenderStyle="ButtonRenderStyle.Secondary" 
+                                                  IconCssClass="fa-solid fa-barcode" 
                                                   SizeMode="SizeMode.Small"
                                                   Click="@(() => ShowScannerModal = true)"
-                                                  title="Scan Barcode" /> *@
+                                                  title="Scan Barcode" />
                                     
                                 </HeaderCaptionTemplate>
                                 <CellDisplayTemplate>
@@ -345,7 +345,7 @@ else
     
     private bool ShowProductModal = false;
     private bool ShowScannerModal = false;
-    private string currencySymbol = "$";
+    private string currencySymbol = "PKR";
     private IGrid ItemsGrid;
 
     private int TotalQuantity => CurrentIR.InventoryReceivingItems.Sum(i => i.Quantity);
@@ -422,6 +422,18 @@ else
     {
         get => CurrentIR.PurchaseOrderId?.ToString() ?? "";
         set => CurrentIR.PurchaseOrderId = int.TryParse(value, out int result) ? result : null;
+    }
+
+    private void OnProductChanged(InventoryReceivingItem item, int productId)
+    {
+        item.ProductId = productId;
+        var prod = Products.FirstOrDefault(p => p.Id == productId);
+        if (prod != null)
+        {
+            item.CostPrice = prod.CostPrice;
+            item.Quantity = 1;
+            CalculateItemTotal(item);
+        }
     }
 
     private void CalculateItemTotal(object editModel)

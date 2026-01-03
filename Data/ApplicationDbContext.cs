@@ -27,7 +27,7 @@ namespace EyeHospitalPOS.Data
 
         // Product Management
         public DbSet<Product> Products { get; set; }
-        public DbSet<ProductCategory> ProductCategories { get; set; } // Matches your model name
+        public DbSet<ProductCategory> ProductCategories { get; set; } 
         public DbSet<ProductType> ProductTypes { get; set; }
 
         // Sales & Invoice
@@ -151,7 +151,7 @@ namespace EyeHospitalPOS.Data
                 .HasForeignKey(si => si.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // 3. FIX: DECIMAL PRECISION WARNINGS
+           
             // Sale Entity
             builder.Entity<Sale>(entity => {
                 entity.Property(s => s.TotalAmount).HasPrecision(18, 2);
@@ -335,9 +335,9 @@ namespace EyeHospitalPOS.Data
                     Email = "info@eyehospitalpos.com",
                     TaxId = "12-3456789",
                     LicenseNumber = "MED-2024-001",
-                    Currency = "USD ($)",
-                    TimeZone = "UTC-5 (Eastern Time)",
-                    DateFormat = "MM/DD/YYYY"
+                    Currency = "PKR (PKR)",
+                    TimeZone = "Pakistan Standard Time (UTC+5)",
+                    DateFormat = "DD/MM/YYYY"
                 }
             );
 

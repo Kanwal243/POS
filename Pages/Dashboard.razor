@@ -76,14 +76,14 @@
                                     <i class="fa-solid fa-coins text-white fs-5"></i>
                                 </div>
                                 <div>
-                                    <p class="text-white text-opacity-75 tiny fw-bold text-uppercase mb-1">Total Sales</p>
+                                    <p class="text-white text-opacity-75 tiny fw-bold text-uppercase mb-1">Total Sales (PKR)</p>
                                     <h2 class="mb-0 fw-bold">@FormatCurrency(data.SalesAmount)</h2>
                                 </div>
                             </div>
                             <div class="d-flex align-items-center">
                                 <span class="badge bg-white bg-opacity-20 text-white rounded-pill px-2 py-1 tiny me-2">
-                                    <i class="fa-solid fa-chart-line me-1"></i> +@data.SalesTrendPercentage%
-                                </span>
+@*                                     <i class="fa-solid fa-chart-line me-1"></i> +@data.SalesTrendPercentage%
+ *@                                </span>
                                 <span class="text-white text-opacity-75 tiny">Growth</span>
                             </div>
                         </div>
@@ -158,6 +158,10 @@
                                                   ValueField="@(s => s.Value)">
                                     <DxChartSeriesPoint Symbol="ChartPointSymbol.Circle" Size="8" />
                                 </DxChartLineSeries>
+                                <DxChartValueAxis>
+                                    <DxChartAxisLabel Format='@ChartElementFormat.FixedPoint(0)' />
+                                    <DxChartAxisTitle Text="@($"Amount ({currencySymbol})")" />
+                                </DxChartValueAxis>
                                 <DxChartArgumentAxis>
                                     <DxChartAxisTitle Text="Month" />
                                 </DxChartArgumentAxis>
@@ -230,7 +234,7 @@
 
 @code {
     private EyeHospitalPOS.Controllers.DashboardData data = new EyeHospitalPOS.Controllers.DashboardData();
-    private string currencySymbol = "$";
+    private string currencySymbol = "PKR";
 
     protected override async Task OnInitializedAsync()
     {
@@ -251,7 +255,7 @@
     private async Task LoadOrganizationSettings()
     {
         var org = await DbContext.Organizations.FirstOrDefaultAsync();
-        currencySymbol = "Rs. "; // Override to use Rupees symbol instead of organization's default
+        currencySymbol = CurrencyHelper.GetCurrencySymbol(org);
     }
 
     private async Task LoadDashboardData()

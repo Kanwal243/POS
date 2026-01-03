@@ -121,7 +121,7 @@ else
     private List<ProductCategory> AllCategories = new List<ProductCategory>();
     private List<ProductCategory> ParentCategories => AllCategories.Where(c => c.Id != CurrentCategory.Id).ToList();
     private List<Product> CategoryProducts = new List<Product>();
-    private string currencySymbol = "$";
+    private string currencySymbol = "PKR";
     
     // Binding helper for Code (handles nulls if needed, though model init helps)
     private string CurrentLocationCode

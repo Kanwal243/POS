@@ -4,7 +4,6 @@
 	  <TargetFramework>net8.0</TargetFramework>
 	  <Nullable>enable</Nullable>
 	  <ImplicitUsings>enable</ImplicitUsings>
-	  <UserSecretsId>aspnet-EyeHospitalPOS-c34f4e51-0a49-4d31-be0e-afcb6e97c15d</UserSecretsId>
   </PropertyGroup>
 
 

@@ -7,7 +7,7 @@ namespace EyeHospitalPOS.Helper
     {
         public static string GetCurrencySymbol(string? currencyString)
         {
-            if (string.IsNullOrEmpty(currencyString)) return "$";
+            if (string.IsNullOrEmpty(currencyString)) return "PKR";
             var start = currencyString.IndexOf('(');
             var end = currencyString.IndexOf(')');
             if (start != -1 && end != -1 && end > start + 1)

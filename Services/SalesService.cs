@@ -120,37 +120,39 @@ namespace EyeHospitalPOS.Services
 
         public async Task<List<KeyValuePair<string, decimal>>> GetTopCustomersAsync(int count)
         {
-            return await _context.Sales
-                .Where(s => s.CustomerId != null)
+            var data = await _context.Sales
+                .Where(s => s.Customer != null)
                 .GroupBy(s => s.Customer.DisplayName)
-                .Select(g => new KeyValuePair<string, decimal>(g.Key, g.Sum(s => s.TotalAmount)))
+                .Select(g => new { Label = g.Key, Value = g.Sum(s => s.TotalAmount) })
                 .OrderByDescending(x => x.Value)
                 .Take(count)
                 .ToListAsync();
+
+            return data.Select(x => new KeyValuePair<string, decimal>(x.Label, x.Value)).ToList();
         }
 
         public async Task<List<KeyValuePair<string, decimal>>> GetTopProductsAsync(int count)
         {
-            // Note: This is an approximation. Ideally we should GroupBy ProductId and Join with Product table, 
-            // but SaleItems has Product reference (if loaded) or ProductId.
-            // Assuming SaleItems table exists and is linked.
-             return await _context.SaleItems
-                .Include(si => si.Product)
+            var data = await _context.SaleItems
+                .Where(si => si.Product != null)
                 .GroupBy(si => si.Product.Name)
-                .Select(g => new KeyValuePair<string, decimal>(g.Key, g.Sum(si => si.Quantity))) // Top products by Quantity sold
+                .Select(g => new { Label = g.Key, Value = (decimal)g.Sum(si => si.Quantity) })
                 .OrderByDescending(x => x.Value)
                 .Take(count)
                 .ToListAsync();
+
+            return data.Select(x => new KeyValuePair<string, decimal>(x.Label, x.Value)).ToList();
         }
 
         public async Task<List<KeyValuePair<string, decimal>>> GetSalesByCategoryAsync()
         {
-             return await _context.SaleItems
-                .Include(si => si.Product)
-                .ThenInclude(p => p.Category)
+            var data = await _context.SaleItems
+                .Where(si => si.Product != null && si.Product.Category != null)
                 .GroupBy(si => si.Product.Category.Name)
-                .Select(g => new KeyValuePair<string, decimal>(g.Key, g.Sum(si => si.Quantity))) // Sales by Category Quantity
+                .Select(g => new { Label = g.Key, Value = (decimal)g.Sum(si => si.Quantity) })
                 .ToListAsync();
+
+            return data.Select(x => new KeyValuePair<string, decimal>(x.Label, x.Value)).ToList();
         }
 
         public async Task<Sale?> GetSaleByIdAsync(int id)

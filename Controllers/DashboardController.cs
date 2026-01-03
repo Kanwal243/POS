@@ -32,18 +32,22 @@ namespace EyeHospitalPOS.Controllers
         {
             try
             {
-                var summary = await _context.DashboardSummary.FirstOrDefaultAsync();
-                
-                var topCustomersRaw = await _context.TopCustomers.ToListAsync();
-                var topProductsRaw = await _context.TopProducts.ToListAsync();
-                var categorySalesRaw = await _context.CategorySales.ToListAsync();
-                
-                // Active alerts & Dynamic metrics
+                // Basic metrics
                 var todaysSales = await _salesService.GetTodaysTotalSalesAsync();
                 var todaysOrders = await _salesService.GetTodaysTotalOrdersAsync();
                 var totalOrders = await _context.Sales.CountAsync();
+                var totalSalesAmount = await _salesService.GetTotalSalesAmountAsync();
+                var customerCount = await _context.Customers.CountAsync();
+                var productCount = await _context.Products.CountAsync(p => p.IsActive);
+                var totalStockValue = await _productService.GetTotalStockValueAsync();
+                
+                // Purchase metrics (assuming simple sum for now if service doesn't have it, or using PO service if available)
+                var purchaseAmount = await _context.PurchaseOrders.SumAsync(po => po.TotalAmount);
+
+                // Inventory alerts
                 var lowStockProducts = await _productService.GetLowStockProductsAsync();
 
+                // Recent sales list
                 var recentSales = await _context.Sales
                     .Include(s => s.Customer)
                     .OrderByDescending(s => s.SaleDate)
@@ -54,33 +58,37 @@ namespace EyeHospitalPOS.Controllers
                         CustomerName = s.Customer != null ? s.Customer.DisplayName : "Walk-in",
                         Date = s.SaleDate,
                         Amount = s.TotalAmount,
-                        Status = "Paid" // Defaulting for now
+                        Status = "Completed"
                     })
                     .ToListAsync();
 
+                // Monthly History (Last 6 months)
                 var monthlyHistory = new List<DashboardChartItem>();
                 var now = DateTime.Now;
                 for (int i = 5; i >= 0; i--)
                 {
                     var date = now.AddMonths(-i);
-                    var monthName = date.ToString("MMM");
+                    var monthStart = new DateTime(date.Year, date.Month, 1);
+                    var monthEnd = monthStart.AddMonths(1).AddDays(-1);
                     
-                    // Try to get real data
                     var monthTotal = await _context.Sales
-                        .Where(s => s.SaleDate.Month == date.Month && s.SaleDate.Year == date.Year)
+                        .Where(s => s.SaleDate >= monthStart && s.SaleDate <= monthEnd)
                         .SumAsync(s => s.TotalAmount);
                     
-                    // If 0 and we want it to look "smooth" for the user, maybe add some variation if i > 0
-                    // But for a real app, 0 is correct. Let's stick to real unless it's demo.
-                    // User asked to "look like this", so I'll add a bit of variety if 0 for demonstration if needed, 
-                    // but I'll stick to real data first.
-                    monthlyHistory.Add(new DashboardChartItem { Label = monthName, Value = monthTotal });
+                    monthlyHistory.Add(new DashboardChartItem 
+                    { 
+                        Label = date.ToString("MMM"), 
+                        Value = monthTotal 
+                    });
                 }
 
                 // Trends (Compared to last month)
                 var lastMonthDate = DateTime.Now.AddMonths(-1);
+                var lastMonthStart = new DateTime(lastMonthDate.Year, lastMonthDate.Month, 1);
+                var lastMonthEnd = lastMonthStart.AddMonths(1).AddDays(-1);
+                
                 var lastMonthSales = await _context.Sales
-                    .Where(s => s.SaleDate.Month == lastMonthDate.Month && s.SaleDate.Year == lastMonthDate.Year)
+                    .Where(s => s.SaleDate >= lastMonthStart && s.SaleDate <= lastMonthEnd)
                     .SumAsync(s => s.TotalAmount);
                 
                 decimal salesTrend = 0;
@@ -90,6 +98,11 @@ namespace EyeHospitalPOS.Controllers
                     salesTrend = ((thisMonthSales - lastMonthSales) / lastMonthSales) * 100;
                 }
 
+                // Get chart data from service
+                var topCustomers = await _salesService.GetTopCustomersAsync(5);
+                var topProducts = await _salesService.GetTopProductsAsync(5);
+                var categorySales = await _salesService.GetSalesByCategoryAsync();
+
                 return new DashboardData
                 {
                     TodaysSales = todaysSales,
@@ -97,23 +110,23 @@ namespace EyeHospitalPOS.Controllers
                     TotalOrders = totalOrders,
                     LowStockCount = lowStockProducts.Count,
                     
-                    CustomerCount = await _context.Customers.CountAsync(c => c.Id != 1), // Exclude Walk-in default if needed, or include all
-                    ProductCount = summary?.ProductCount ?? 0,
-                    PurchaseAmount = summary?.PurchaseAmount ?? 0,
-                    SalesAmount = summary?.SalesAmount ?? 0,
-                    StockAmount = summary?.StockAmount ?? 0,
-                    ProfitLoss = (summary?.SalesAmount ?? 0) - (summary?.PurchaseAmount ?? 0),
+                    CustomerCount = customerCount,
+                    ProductCount = productCount,
+                    PurchaseAmount = purchaseAmount,
+                    SalesAmount = totalSalesAmount,
+                    StockAmount = totalStockValue,
+                    ProfitLoss = totalSalesAmount - purchaseAmount,
                     
                     SalesTrendPercentage = Math.Round(salesTrend, 1),
-                    MonthlyTargetPercentage = 75.5m, // Mocked to match screenshot look
+                    MonthlyTargetPercentage = 100, // Default target
                     
-                    TopCustomers = topCustomersRaw.Select(x => new DashboardChartItem { Label = x.DisplayName, Value = x.TotalAmount }).ToList(),
-                    TopProducts = topProductsRaw.Select(x => new DashboardChartItem { Label = x.ProductName, Value = x.TotalQuantity }).ToList(),
-                    CategorySales = categorySalesRaw.Select(x => new DashboardChartItem { Label = x.CategoryName, Value = x.TotalQuantity }).ToList(),
+                    TopCustomers = topCustomers.Select(x => new DashboardChartItem { Label = x.Key, Value = x.Value }).ToList(),
+                    TopProducts = topProducts.Select(x => new DashboardChartItem { Label = x.Key, Value = x.Value }).ToList(),
+                    CategorySales = categorySales.Select(x => new DashboardChartItem { Label = x.Key, Value = x.Value }).ToList(),
                     MonthlySalesHistory = monthlyHistory,
                     RecentSales = recentSales,
                     
-                    Notifications = lowStockProducts.Select(p => $"{p.Name} Needs to re-order ! Stock: {p.StockQuantity}").ToList(),
+                    Notifications = lowStockProducts.Select(p => $"{p.Name} low on stock: {p.StockQuantity} (Reorder level: {p.ReorderLevel})").ToList(),
                     
                     Success = true
                 };
